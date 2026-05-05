@@ -6,7 +6,7 @@ import { useSidebar } from "@/lib/sidebar-context"
 export function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar()
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen app-bg">
       <AppSidebar />
       <main
         className="transition-all duration-300 p-6"

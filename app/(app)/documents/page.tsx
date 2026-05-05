@@ -6,7 +6,6 @@ import {
   Upload, FileText, Download, Shield, Lock,
   CheckCircle, Loader2, Clock, X, Anchor, Sparkles, Trash2
 } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -226,16 +225,13 @@ export default function DocumentsPage() {
 
       {/* Upload Zone */}
       <motion.div variants={itemVariants}>
-        <Card
-          className={`border-2 border-dashed transition-all duration-300 ${
-            isDragging ? 'border-brass bg-brass/10' : 'border-border/50 bg-card/50 hover:border-brass/50'
-          }`}
+        <div
+          className={`glass-upload p-8 ${isDragging ? 'dragging' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center justify-center text-center">
+          <div className="flex flex-col items-center justify-center text-center">
               <motion.div
                 animate={isDragging ? { scale: 1.1 } : { scale: 1 }}
                 className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brass/20 border border-brass/30"
@@ -259,17 +255,15 @@ export default function DocumentsPage() {
                 />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </motion.div>
 
       {/* Uploading */}
       {uploadingFiles.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
           {uploadingFiles.map((name, i) => (
-            <Card key={i} className="border-brass/30 bg-brass/5">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
+            <div key={i} className="glass-sm p-3">
+              <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-4 w-4 text-brass animate-spin" />
                     <span className="text-sm text-foreground">{name}</span>
@@ -282,15 +276,14 @@ export default function DocumentsPage() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           ))}
         </motion.div>
       )}
 
       {/* Documents Table */}
       <motion.div variants={itemVariants}>
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+        <div className="glass-table">
           {loading ? (
             <div className="flex items-center justify-center p-12">
               <Loader2 className="h-6 w-6 text-brass animate-spin" />
@@ -368,14 +361,13 @@ export default function DocumentsPage() {
               </TableBody>
             </Table>
           )}
-        </Card>
+        </div>
       </motion.div>
 
       {/* Security Banner */}
       <motion.div variants={itemVariants}>
-        <Card className="border-border/50 bg-navy-medium/30">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+        <div className="glass-security p-4">
+          <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-starboard-green" />
                 <span>ZDR</span>
@@ -393,8 +385,7 @@ export default function DocumentsPage() {
               <div className="h-4 w-px bg-border" />
               <span>Datos anonimizados antes del análisis</span>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </motion.div>
     </motion.div>
   )
