@@ -1,48 +1,40 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Comparación en tiempo constante (evita timing attacks)
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let out = 0
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return out === 0
+}
+
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  const { pathname } = request.nextUrl
+  const GATE = process.env.GATE_TOKEN
+  const cookie = request.cookies.get('fa_session')?.value || ''
+  const authed = !!GATE && safeEqual(cookie, GATE)
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+  // Rutas públicas: el login del camión ("/") y la API de acceso
+  const isLogin = pathname === '/'
+  const isAcceso = pathname.startsWith('/api/acceso')
 
-  const { data: { user } } = await supabase.auth.getUser()
+  if (!GATE) return NextResponse.next()
 
-  // Protect all internal application routes
-  const protectedRoutes = ['/dashboard', '/chat', '/documents', '/findings', '/simulator']
-  const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
-
-  if (!user && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // Ya autenticado y en el login -> a la app
+  if (authed && isLogin) {
+    return NextResponse.redirect(new URL('/inicio', request.url))
   }
 
-  // Si ya está autenticado y va al login, redirigir al dashboard
-  if (user && request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Sin sesión y ruta protegida -> al login (no se sirve nada)
+  if (!authed && !isLogin && !isAcceso) {
+    const res = NextResponse.redirect(new URL('/', request.url))
+    res.headers.set('Cache-Control', 'no-store')
+    return res
   }
 
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)'],
 }
