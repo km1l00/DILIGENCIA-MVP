@@ -1,12 +1,9 @@
 "use client"
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Eye, EyeOff, ShieldCheck } from "lucide-react"
+import { ShieldCheck } from "lucide-react"
 
 export default function LoginPage() {
-  const [user, setUser] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(false)
 
@@ -16,8 +13,6 @@ export default function LoginPage() {
     try {
       const res = await fetch("/api/acceso", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user, pass: password }),
       })
       if (res.ok) {
         window.location.href = "/inicio"
@@ -90,35 +85,11 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="user" className="text-sm font-medium text-white/90">Usuario</label>
-              <input
-                id="user" type="text" value={user} onChange={(e) => setUser(e.target.value)}
-                placeholder="usuario" required autoComplete="username"
-                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '12px', color: 'white', height: '44px', width: '100%', padding: '0 14px' }}
-                className="placeholder:text-white/40 outline-none focus:border-[rgba(234,188,31,0.6)]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-white/90">Contraseña</label>
-              <div className="relative">
-                <input
-                  id="password" type={showPassword ? "text" : "password"} value={password}
-                  onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required autoComplete="current-password"
-                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '12px', color: 'white', height: '44px', width: '100%', padding: '0 44px 0 14px' }}
-                  className="placeholder:text-white/40 outline-none focus:border-[rgba(234,188,31,0.6)]"
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/90 transition-colors">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <p className="text-center text-sm text-white/80">Acceso de demostración · <span className="text-white">franco.admin</span></p>
 
             {error && (
               <div style={{ fontSize: 12.5, color: '#ffdada', background: 'rgba(224,82,82,.28)', border: '1px solid rgba(255,150,150,.5)', borderRadius: 10, padding: '8px 12px' }}>
-                Usuario o contraseña incorrectos.
+                No fue posible iniciar la sesión. Intente de nuevo.
               </div>
             )}
 
@@ -127,7 +98,7 @@ export default function LoginPage() {
               className="w-full h-11 font-semibold transition-all duration-200 disabled:opacity-60 flex justify-center items-center"
               style={{ background: 'linear-gradient(135deg, #EABC1F 0%, #F0CB45 100%)', color: '#1D3A45', borderRadius: '12px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer' }}
             >
-              {isLoading ? "Verificando..." : "Ingresar al Portal"}
+              {isLoading ? "Ingresando..." : "Ingresar al Portal"}
             </button>
           </form>
 
