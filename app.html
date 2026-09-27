@@ -49,6 +49,7 @@
   .nav-item.active{background:rgba(234,188,31,.15);color:var(--gold)}
   .nav-item.active::before{content:"";position:absolute;left:0;top:50%;height:24px;width:4px;transform:translateY(-50%);border-radius:0 4px 4px 0;background:var(--gold)}
   .nav-item svg{height:16px;width:16px;flex-shrink:0}
+.glass-btn-primary svg,.glass-btn-ghost svg,.glass-pill svg{height:16px;width:16px;flex-shrink:0}
   aside.collapsed .nav-item{justify-content:center}
   .side-footer{border-top:1px solid rgba(234,188,31,.15);padding:12px;flex-shrink:0}
   .logout{display:flex;width:100%;align-items:center;gap:12px;border:none;background:none;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:500;color:rgba(255,255,255,.6);cursor:pointer;transition:all .2s}
@@ -387,8 +388,6 @@ let contratoDocOpen=false, contratoMejOpen=false;
 const contratoBaseScore=2.6;
 const contratoImpact={C1:0.6,C2:0.5,C3:0.3,C4:0.2,C5:0.1};
 let contratoImpl={};
-function contratoScore(){const add=Object.keys(contratoImpl).filter(k=>contratoImpl[k]).reduce((a,k)=>a+(contratoImpact[k]||0),0);return{score:Math.min(contratoBaseScore+add,5),add:add};}
-function implementar(id){contratoImpl[id]=true;renderContratos();renderDashboard();updateSideScore();}
 const contratoFindings=[
  {id:'C1',risk:'alto',area:'Responsabilidad',titulo:'Monto de indemnización por retraso en la entrega no está definido',
   desc:'El contrato no fija el límite ni el alcance de la responsabilidad de la empresa de transporte frente al retraso en la entrega de la mercancía, lo que genera incertidumbre sobre la indemnización aplicable.',
@@ -806,25 +805,92 @@ function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 
 /* ===== Módulo 2: Contratos ===== */
 let contratoExpanded=null, diffOpen={};
+let CT=null, CT_LIST=[], ctCargando=false, ctArchivo='', ctImplementando=null, ctExportOpen=false;
+function contratoScore(){
+ if(CT)return {score:CT.contrato.score,add:CT.contrato.add};
+ const add=Object.keys(contratoImpl).filter(k=>contratoImpl[k]).reduce((a,k)=>a+(contratoImpact[k]||0),0);return{score:Math.min(contratoBaseScore+add,5),add:add};
+}
+function contratoVista(){
+ if(!CT)return {c:contrato,texto:contratoTexto,archivo:'',original:false,
+  findings:contratoFindings.map(f=>({...f,imp:contratoImpact[f.id],impl:!!contratoImpl[f.id]})),
+  propuesta:contratoClausulasMejorado,titulo:'CONTRATO DE TRANSPORTE TERRESTRE DE CARGA'};
+ const k=CT.contrato;
+ const ORD=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA','SEXTA','SÉPTIMA','OCTAVA','NOVENA','DÉCIMA','DÉCIMA PRIMERA','DÉCIMA SEGUNDA','DÉCIMA TERCERA','DÉCIMA CUARTA','DÉCIMA QUINTA','DÉCIMA SEXTA','DÉCIMA SÉPTIMA','DÉCIMA OCTAVA','DÉCIMA NOVENA','VIGÉSIMA'];
+ return {c:{nombre:k.nombre,partes:k.partes||'',fecha:k.fecha||'—',clausulas:k.num_clausulas},texto:k.texto_original,archivo:k.archivo_nombre||'',original:k.tiene_original,
+  findings:CT.hallazgos.map(h=>({id:h.codigo,risk:h.risk,area:h.area||'',titulo:h.titulo,desc:h.descr||'',base:h.base||[],old:h.old_text||'',new:h.new_text,imp:Number(h.impacto),impl:!!h.implementado})),
+  propuesta:CT.propuesta.map((c,i)=>({t:(ORD[i]||('CLÁUSULA '+(i+1)))+'. '+c.nombre,body:c.body,status:c.status})),titulo:k.nombre.toUpperCase()};
+}
+async function cargarContratos(){
+ try{
+  const l=await api('/api/lc/contratos');CT_LIST=l.contratos;
+  const act=CT_LIST.find(x=>x.activo)||CT_LIST[0];
+  if(act){CT=await api('/api/lc/contratos/'+act.id);}
+  renderContratos();
+ }catch(e){respaldo(e);}
+}
+function elegirContrato(){
+ if(ctCargando)return;
+ const inp=document.createElement('input');inp.type='file';inp.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+ inp.onchange=()=>{if(inp.files&&inp.files[0])subirContrato(inp.files[0]);};inp.click();
+}
+async function subirContrato(file){
+ if(!/\.(pdf|docx)$/i.test(file.name)){aviso('Cargue el contrato en PDF o DOCX.','error');return;}
+ if(file.size>4*1024*1024){aviso('El archivo supera 4 MB.','error');return;}
+ ctCargando=true;ctArchivo=file.name;renderContratos();
+ const fd=new FormData();fd.append('file',file);
+ try{
+  CT=await api('/api/lc/contratos',{method:'POST',body:fd,timeout:290000});
+  contratoExpanded=null;diffOpen={};
+  aviso('Contrato analizado: '+CT.hallazgos.length+' hallazgos · riesgo '+CT.contrato.score.toFixed(1)+'/5.','ok');
+  api('/api/lc/contratos').then(l=>{CT_LIST=l.contratos;renderContratos();}).catch(()=>{});
+  cargarPanel();
+ }catch(e){aviso('No se pudo analizar el contrato: '+e.message,'error');}
+ finally{ctCargando=false;renderContratos();}
+}
+async function cambiarContrato(id){
+ if(!id||(CT&&CT.contrato.id===id))return;
+ try{CT=await api('/api/lc/contratos/'+id+'/activar',{method:'POST'});contratoExpanded=null;diffOpen={};
+  CT_LIST.forEach(x=>x.activo=x.id===id);renderContratos();cargarPanel();}
+ catch(e){aviso('No se pudo abrir el contrato: '+e.message,'error');}
+}
+async function implementar(id){
+ if(!CT){contratoImpl[id]=true;renderContratos();renderDashboard();updateSideScore();return;}
+ if(ctImplementando)return;ctImplementando=id;renderContratos();
+ try{CT=await api('/api/lc/contratos/'+CT.contrato.id+'/implementar',{method:'POST',body:{codigo:id}});
+  const it=CT_LIST.find(x=>x.id===CT.contrato.id);if(it)it.score=CT.contrato.score;
+  aviso('Cláusula implementada. Riesgo del contrato: '+CT.contrato.score.toFixed(1)+'/5.','ok');cargarPanel();}
+ catch(e){aviso('No se pudo implementar: '+e.message,'error');}
+ finally{ctImplementando=null;renderContratos();}
+}
+function exportarContrato(fmt,version){
+ if(!CT){aviso('La exportación requiere conexión con el servidor.');return;}
+ const a=document.createElement('a');a.href='/api/lc/contratos/'+CT.contrato.id+'/export?format='+fmt+'&version='+(version||'propuesta');a.download='';document.body.appendChild(a);a.click();a.remove();
+}
 function renderContratos(){
- const c=contrato;
+ const V=contratoVista(),c=V.c;
  const cs=contratoScore();
  const csLabel=cs.score>=4.5?'Riesgo Bajo':cs.score>=4?'Riesgo Bajo-Medio':cs.score>=3?'Riesgo Medio':cs.score>=2?'Riesgo Moderado-Alto':'Riesgo Alto';
  document.getElementById('view-contratos').innerHTML=`
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
    <div><h1 class="page">Revisión de Contratos</h1><p class="sub">Análisis de cláusulas, riesgos, faltantes y redacción mejorada</p></div>
-   <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px" onclick="alert('Demo: cargar un nuevo contrato para análisis')">${I.upload}Cargar contrato</button>
+   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    ${CT_LIST.length>1?`<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">Contrato
+     <select class="sel" onchange="cambiarContrato(this.value)">${CT_LIST.map(x=>`<option value="${x.id}" ${CT&&CT.contrato.id===x.id?'selected':''}>${esc((x.archivo_nombre||x.nombre).slice(0,42))} · ${new Date(x.created_at).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} · ${Number(x.score).toFixed(1)}</option>`).join('')}</select></label>`:''}
+    <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${ctCargando?';opacity:.7':''}" ${ctCargando?'disabled':''} onclick="elegirContrato()">${I.upload}Cargar contrato</button>
+   </div>
   </div>
-  <div class="glass-upload" style="padding:20px;margin-top:20px;display:flex;align-items:center;gap:16px" onclick="alert('Demo: cargar contrato (PDF/DOCX)')">
+  <div class="glass-upload" style="padding:20px;margin-top:20px;display:flex;align-items:center;gap:16px" onclick="elegirContrato()"
+   ondragover="event.preventDefault()" ondrop="event.preventDefault();if(event.dataTransfer.files[0])subirContrato(event.dataTransfer.files[0])">
    <div style="display:flex;height:48px;width:48px;align-items:center;justify-content:center;border-radius:12px;background:rgba(234,188,31,.2);color:#EABC1F;flex-shrink:0">${I.upload}</div>
    <div><p style="font-weight:600">Arrastre un contrato o haga clic para analizar</p><p class="sub" style="font-size:12px">PDF, DOCX · el análisis identifica cláusulas, riesgos y faltantes</p></div>
   </div>
+  ${ctCargando?loaderCard('Analizando '+esc(ctArchivo)+'…','Extrayendo el texto · identificando cláusulas · evaluando riesgos para el generador · redactando mejoras (puede tardar hasta 2 minutos)'):''}
   <div class="glass-score" style="padding:24px;margin-top:20px">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:16px">
      <div style="display:flex;height:52px;width:52px;align-items:center;justify-content:center;border-radius:14px;background:rgba(37,75,89,.08);color:#254B59">${I.scale}</div>
-     <div><h2 style="font-size:16px;font-weight:700">${c.nombre}</h2><p class="sub" style="font-size:13px">${c.partes}</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:2px">Fecha: ${c.fecha} · ${c.clausulas} cláusulas analizadas · ${contratoFindings.length} hallazgos</p></div>
+     <div><h2 style="font-size:16px;font-weight:700">${esc(c.nombre)}</h2><p class="sub" style="font-size:13px">${esc(c.partes)}</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px">Fecha: ${esc(c.fecha)} · ${c.clausulas} cláusulas analizadas · ${V.findings.length} hallazgos${V.archivo?' · '+esc(V.archivo):''}</p></div>
     </div>
     <div style="text-align:center">
      <p style="font-size:12px;color:var(--muted)">Riesgo del contrato</p>
@@ -832,59 +898,63 @@ function renderContratos(){
       <div style="font-size:38px;font-weight:700;font-variant-numeric:tabular-nums;color:${scoreColorInst(cs.score)};transition:color .5s">${cs.score.toFixed(1)}</div>
       ${cs.add>0?`<span style="font-size:14px;font-weight:700;color:#2f7d5b">+${cs.add.toFixed(1)}</span>`:''}</div>
      <span class="badge-pill" style="background:${scoreColorInst(cs.score)}18;border:1px solid ${scoreColorInst(cs.score)}55;color:${scoreColorInst(cs.score)}">${csLabel}</span>
-     ${cs.add>0?`<p style="font-size:11px;color:var(--muted);margin-top:6px">Mejora simulada al implementar cláusulas</p>`:''}
+     ${cs.add>0?`<p style="font-size:11px;color:var(--muted);margin-top:6px">Mejora por cláusulas implementadas</p>`:''}
     </div>
    </div>
-   <div style="border-top:1px solid rgba(37,75,89,.1);margin-top:16px;padding-top:12px;display:flex;gap:20px;flex-wrap:wrap">
+   ${CT&&CT.contrato.resumen?`<p style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:14px">${esc(CT.contrato.resumen)}</p>`:''}
+   <div style="border-top:1px solid rgba(37,75,89,.1);margin-top:16px;padding-top:12px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
     <button onclick="contratoDocOpen=!contratoDocOpen;renderContratos()" style="display:flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;color:#254B59;font-size:13px;font-weight:600;padding:0">
      <span style="width:16px;height:16px;display:inline-flex;color:#EABC1F">${I.file}</span>${contratoDocOpen?'Ocultar contrato original':'Ver contrato analizado'}
      <span class="chevron ${contratoDocOpen?'open':''}" style="width:16px;height:16px;display:inline-flex;color:var(--muted)">${I.chevDown}</span></button>
     <button onclick="contratoMejOpen=!contratoMejOpen;renderContratos()" style="display:flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;color:#2f7d5b;font-size:13px;font-weight:600;padding:0">
      <span style="width:16px;height:16px;display:inline-flex">${I.check2}</span>${contratoMejOpen?'Ocultar contrato mejorado':'Ver contrato con cambios propuestos'}
      <span class="chevron ${contratoMejOpen?'open':''}" style="width:16px;height:16px;display:inline-flex;color:var(--muted)">${I.chevDown}</span></button>
+    ${V.original?`<a href="/api/lc/contratos/${CT.contrato.id}/original" style="display:flex;align-items:center;gap:8px;color:#254B59;font-size:13px;font-weight:600;text-decoration:none"><span style="width:16px;height:16px;display:inline-flex;color:#EABC1F">${I.download}</span>Descargar archivo original</a>`:''}
    </div>
-   ${contratoDocOpen?`<pre style="margin-top:12px;background:rgba(37,75,89,.04);border:1px solid rgba(37,75,89,.1);border-radius:12px;padding:16px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:#2b4753;max-height:360px;overflow:auto">${contratoTexto.replace(/</g,'&lt;')}</pre>`:''}
+   ${contratoDocOpen?`<pre style="margin-top:12px;background:rgba(37,75,89,.04);border:1px solid rgba(37,75,89,.1);border-radius:12px;padding:16px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:#2b4753;max-height:360px;overflow:auto">${esc(V.texto)}</pre>`:''}
    ${contratoMejOpen?`<div style="margin-top:12px;background:rgba(37,75,89,.03);border:1px solid rgba(37,75,89,.12);border-radius:12px;padding:18px;max-height:420px;overflow:auto">
      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:11px;color:var(--muted)">
       <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#2f7d5b"></span>Cláusula nueva</span>
       <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#a97e28"></span>Cláusula modificada</span>
       <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#c3ccd6"></span>Sin cambios</span></div>
-     <p style="text-align:center;font-weight:700;font-size:14px;margin-bottom:4px">CONTRATO DE TRANSPORTE TERRESTRE DE CARGA</p>
-     <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">Grupo NF S.A.S. (empresa de transporte) · Ingenio Providencia S.A. (generador) — versión con cambios propuestos</p>
-     ${contratoClausulasMejorado.map(cl=>{const c=cl.status==='new'?'#2f7d5b':cl.status==='mod'?'#a97e28':'#c3ccd6';const tag=cl.status==='new'?'NUEVA':cl.status==='mod'?'MODIFICADA':'';
-      return `<div style="border-left:3px solid ${c};padding:2px 0 2px 12px;margin-bottom:14px">
-        <p style="font-size:12.5px;font-weight:700;color:#254B59;display:flex;align-items:center;gap:8px">${cl.t}${tag?`<span style="font-size:9px;font-weight:700;letter-spacing:.05em;color:${c};background:${c}1f;padding:2px 6px;border-radius:5px">${tag}</span>`:''}</p>
-        <p style="font-size:12.5px;line-height:1.6;color:#3a4a54;margin-top:4px">${cl.body}</p>
+     <p style="text-align:center;font-weight:700;font-size:14px;margin-bottom:4px">${esc(V.titulo)}</p>
+     <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">${esc(c.partes)} · versión con cambios propuestos</p>
+     ${V.propuesta.map(cl=>{const col=cl.status==='new'?'#2f7d5b':cl.status==='mod'?'#a97e28':'#c3ccd6';const tag=cl.status==='new'?'NUEVA':cl.status==='mod'?'MODIFICADA':'';
+      return `<div style="border-left:3px solid ${col};padding:2px 0 2px 12px;margin-bottom:14px">
+        <p style="font-size:12.5px;font-weight:700;color:#254B59;display:flex;align-items:center;gap:8px">${esc(cl.t)}${tag?`<span style="font-size:9px;font-weight:700;letter-spacing:.05em;color:${col};background:${col}1f;padding:2px 6px;border-radius:5px">${tag}</span>`:''}</p>
+        <p style="font-size:12.5px;line-height:1.6;color:#3a4a54;margin-top:4px">${esc(cl.body)}</p>
        </div>`;}).join('')}
-     <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="glass-btn-primary" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="alert('Demo: exportar contrato mejorado a Word / PDF')">${I.download}Exportar contrato mejorado</button></div>
+     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;flex-wrap:wrap">
+      <button class="glass-btn-ghost" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="exportarContrato('docx')">${I.download}Exportar a Word</button>
+      <button class="glass-btn-primary" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="exportarContrato('pdf')">${I.download}Exportar a PDF</button></div>
    </div>`:''}
   </div>
   <h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Hallazgos por cláusula</h2>
   <div style="display:flex;flex-direction:column;gap:12px">
-   ${contratoFindings.map(f=>{const open=contratoExpanded===f.id;const impl=!!contratoImpl[f.id];const imp=contratoImpact[f.id];return `
+   ${V.findings.map(f=>{const open=contratoExpanded===f.id;const impl=f.impl;const imp=f.imp;const busy=ctImplementando===f.id;return `
     <div class="glass-finding" style="border-left:4px solid ${impl?'#2f7d5b':riskColor(f.risk)};overflow:hidden;${impl?'background:rgba(46,204,113,.05)':''}">
      <button onclick="contratoExpanded='${open?'':f.id}';renderContratos()" style="width:100%;text-align:left;padding:16px;border:none;background:none;cursor:pointer">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
        <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
          ${impl?`<span class="badge-pill" style="background:rgba(46,204,113,.12);color:#2f7d5b;border:1px solid rgba(47,125,91,.4)"><span style="width:12px;height:12px;display:inline-flex">${I.check2}</span>Implementada</span>`:`<span class="badge-pill" style="background:${riskBg(f.risk)};color:${riskColor(f.risk)};border:1px solid ${riskColor(f.risk)}55">Riesgo ${f.risk[0].toUpperCase()+f.risk.slice(1)}</span>`}
-         <span class="badge-pill" style="border:1px solid rgba(37,75,89,.15);color:var(--muted)">${f.area}</span>
+         <span class="badge-pill" style="border:1px solid rgba(37,75,89,.15);color:var(--muted)">${esc(f.area)}</span>
          <span class="badge-pill" style="background:rgba(46,204,113,.1);color:#2ecc71"><span style="width:12px;height:12px;display:inline-flex">${I.diff}</span>Cláusula mejorada</span></div>
-        <h3 style="font-size:14px;font-weight:600;${impl?'color:var(--muted)':''}">${f.titulo}</h3></div>
+        <h3 style="font-size:14px;font-weight:600;${impl?'color:var(--muted)':''}">${esc(f.titulo)}</h3></div>
        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         <span class="badge-pill" style="background:rgba(46,204,113,.08);color:#2f7d5b">+${imp.toFixed(1)} pts</span>
         <span class="chevron ${open?'open':''}" style="color:var(--muted);width:20px;height:20px;display:inline-flex">${I.chevDown}</span></div>
       </div></button>
      ${open?`<div style="padding:0 16px 16px;border-top:1px solid rgba(37,75,89,.1)">
-       <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-top:14px">${f.desc}</p>
-       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${f.base.map(b=>`<span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${b}</span>`).join('')}</div>
+       <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-top:14px">${esc(f.desc)}</p>
+       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${f.base.map(b=>`<span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${esc(b)}</span>`).join('')}</div>
        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="glass-btn-ghost" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="event.stopPropagation();diffOpen['${f.id}']=!diffOpen['${f.id}'];renderContratos()">${I.diff}${diffOpen[f.id]?'Ocultar':'Ver'} redacción mejorada</button>
-        ${impl?`<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;color:#2f7d5b;background:rgba(46,204,113,.1);border-radius:12px"><span style="width:14px;height:14px;display:inline-flex">${I.check2}</span>Cláusula implementada (+${imp.toFixed(1)} pts)</span>`:`<button class="glass-btn-primary" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="event.stopPropagation();implementar('${f.id}')">${I.sparkles}Implementar cláusula (+${imp.toFixed(1)} al score)</button>`}
+        ${impl?`<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;color:#2f7d5b;background:rgba(46,204,113,.1);border-radius:12px"><span style="width:14px;height:14px;display:inline-flex">${I.check2}</span>Cláusula implementada (+${imp.toFixed(1)} pts)</span>`:`<button class="glass-btn-primary" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px${busy?';opacity:.7':''}" ${busy?'disabled':''} onclick="event.stopPropagation();implementar('${f.id}')">${busy?`<span class="spin" style="width:14px;height:14px;display:inline-flex">${I.compass}</span>Implementando...`:`${I.sparkles}Implementar cláusula (+${imp.toFixed(1)} al score)`}</button>`}
        </div>
        ${diffOpen[f.id]?`<div style="display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-top:12px" class="grid-diff">
-          <div class="diff-col diff-old"><p style="font-size:11px;font-weight:700;color:#e05252;margin-bottom:6px">CLÁUSULA ACTUAL</p>${f.old}</div>
-          <div class="diff-col diff-new"><p style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:6px">REDACCIÓN PROPUESTA</p>${f.new}</div>
+          <div class="diff-col diff-old"><p style="font-size:11px;font-weight:700;color:#e05252;margin-bottom:6px">CLÁUSULA ACTUAL</p>${esc(f.old)}</div>
+          <div class="diff-col diff-new"><p style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:6px">REDACCIÓN PROPUESTA</p>${esc(f.new)}</div>
          </div>`:''}
       </div>`:''}
     </div>`}).join('')}
@@ -892,27 +962,76 @@ function renderContratos(){
 }
 
 /* ===== Módulo 3: Manifiesto ===== */
+let MANIF=null, MANIF_HIST=[], manifCargando=false, manifArchivo='';
+const pesoKg=v=>new Intl.NumberFormat('es-CO',{maximumFractionDigits:1}).format(v)+' kg';
+function manifVista(){
+ if(!MANIF)return {m:manifiesto,campos:manifiestoCampos,errores:manifiestoErrores,score:manifiesto.cumplimiento,archivo:''};
+ const d=MANIF.datos||{};const o=x=>x||{};
+ const P=x=>[o(x).nombre,o(x).identificacion].filter(Boolean).join(' · ');
+ const V=o(d.vehiculo),M=o(d.mercancia),S=o(d.seguro);
+ return {m:{numero:d.numero||'—',autorizacion:d.autorizacion||'—',tipo:d.tipo||'—',expedicion:d.expedicion||'—',
+   empresa:o(d.empresa).nombre||'—',empresaNit:o(d.empresa).nit||'—',origen:o(d.origen).lugar||'—',destino:o(d.destino).lugar||'—',
+   remitente:P(d.remitente)||'—',destinatario:P(d.destinatario)||'—',
+   vehiculo:[V.marca,V.placa&&('Placa '+V.placa),V.configuracion&&('Config. '+V.configuracion)].filter(Boolean).join(' · ')||'—',
+   poseedor:P(d.poseedor)||'—',conductor:P(d.conductor)||'—',mercancia:M.descripcion||'—',
+   peso:M.peso_kg!=null?pesoKg(M.peso_kg):(M.volumen||'—'),seguro:[S.aseguradora,S.poliza&&('Póliza '+S.poliza)].filter(Boolean).join(' · ')||'—',
+   valorTotal:d.valor_total,valorLetras:d.valor_letras||'',ica:d.retencion_ica,
+   carguePor:d.cargue_pagado_por||'(sin diligenciar)',descarguePor:d.descargue_pagado_por||'(sin diligenciar)',fechaPago:d.fecha_pago||'—'},
+  campos:MANIF.campos||[],errores:MANIF.hallazgos||[],score:Number(MANIF.score),archivo:MANIF.archivo_nombre||''};
+}
+async function cargarManifiestos(){
+ try{
+  const h=await api('/api/lc/manifiestos');MANIF_HIST=h.manifiestos;
+  const act=MANIF_HIST.find(x=>x.activo)||MANIF_HIST[0];
+  if(act){const j=await api('/api/lc/manifiestos/'+act.id);MANIF=j.manifiesto;}
+  renderManifiesto();
+ }catch(e){respaldo(e);}
+}
+function elegirManifiesto(){
+ if(manifCargando)return;
+ const inp=document.createElement('input');inp.type='file';inp.accept='application/pdf,.pdf';
+ inp.onchange=()=>{if(inp.files&&inp.files[0])subirManifiesto(inp.files[0]);};inp.click();
+}
+async function subirManifiesto(file){
+ if(file.size>4*1024*1024){aviso('El PDF supera 4 MB.','error');return;}
+ manifCargando=true;manifArchivo=file.name;renderManifiesto();
+ const fd=new FormData();fd.append('file',file);
+ try{
+  const j=await api('/api/lc/manifiestos',{method:'POST',body:fd,timeout:170000});
+  MANIF=j.manifiesto;aviso('Manifiesto '+(MANIF.numero||file.name)+' analizado: '+(MANIF.hallazgos||[]).length+' hallazgos.','ok');
+  api('/api/lc/manifiestos').then(h=>{MANIF_HIST=h.manifiestos;renderManifiesto();}).catch(()=>{});
+  cargarPanel();
+ }catch(e){aviso('No se pudo analizar el manifiesto: '+e.message,'error');}
+ finally{manifCargando=false;renderManifiesto();}
+}
+async function verManifiesto(id){
+ try{const j=await api('/api/lc/manifiestos/'+id+'/activar',{method:'POST'});MANIF=j.manifiesto;
+  MANIF_HIST.forEach(x=>x.activo=x.id===id);renderManifiesto();cargarPanel();window.scrollTo({top:0,behavior:'smooth'});}
+ catch(e){aviso('No se pudo abrir el manifiesto: '+e.message,'error');}
+}
 function renderManifiesto(){
- const m=manifiesto;
- const okCount=manifiestoCampos.filter(c=>c.ok).length;
+ const Vm=manifVista(),m=Vm.m;
+ const okCount=Vm.campos.filter(c=>c.ok).length;
  const kv=(k,v)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+ const vacio=v=>/sin diligenciar/.test(v);
  document.getElementById('view-manifiesto').innerHTML=`
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
    <div><h1 class="page">Análisis de Manifiesto de Carga</h1><p class="sub">Verificación contra el Decreto 1079 de 2015 y buenas prácticas del sector</p></div>
-   <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px" onclick="alert('Demo: cargar otro manifiesto (PDF)')">${I.upload}Cargar manifiesto</button>
+   <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${manifCargando?';opacity:.7':''}" ${manifCargando?'disabled':''} onclick="elegirManifiesto()">${I.upload}${MANIF?'Cargar otro manifiesto':'Cargar manifiesto'}</button>
   </div>
+  ${manifCargando?loaderCard('Analizando '+esc(manifArchivo)+'…','Extrayendo datos con IA · verificando los 13 campos del art. 2.2.1.7.5.4 · reglas de pago, tiempos y SICE-TAC'):''}
   <div class="glass-score" style="padding:24px;margin-top:20px">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:16px">
      <div style="display:flex;height:52px;width:52px;align-items:center;justify-content:center;border-radius:14px;background:rgba(224,82,82,.1);color:#e05252">${I.truck}</div>
-     <div><h2 style="font-size:16px;font-weight:700">Manifiesto N.º ${m.numero}</h2>
-      <p class="sub" style="font-size:13px">${m.empresa} · NIT ${m.empresaNit} · Autorización ${m.autorizacion}</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:2px">${m.origen} → ${m.destino} · Expedición ${m.expedicion}</p></div>
+     <div><h2 style="font-size:16px;font-weight:700">Manifiesto N.º ${esc(m.numero)}</h2>
+      <p class="sub" style="font-size:13px">${esc(m.empresa)} · NIT ${esc(m.empresaNit)} · Autorización ${esc(m.autorizacion)}</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px">${esc(m.origen)} → ${esc(m.destino)} · Expedición ${esc(m.expedicion)}${Vm.archivo?' · '+esc(Vm.archivo):''}</p></div>
     </div>
     <div style="text-align:center">
      <p style="font-size:12px;color:var(--muted)">Cumplimiento</p>
-     <div style="font-size:38px;font-weight:700;font-family:monospace;color:${scoreColor(m.cumplimiento)}">${m.cumplimiento.toFixed(1)}</div>
-     <span class="badge-pill" style="background:${scoreColor(m.cumplimiento)}18;border:1px solid ${scoreColor(m.cumplimiento)}4D;color:${scoreColor(m.cumplimiento)}">${okCount}/13 campos · ${manifiestoErrores.length} hallazgos</span>
+     <div style="font-size:38px;font-weight:700;font-family:monospace;color:${scoreColor(Vm.score)}">${Vm.score.toFixed(1)}</div>
+     <span class="badge-pill" style="background:${scoreColor(Vm.score)}18;border:1px solid ${scoreColor(Vm.score)}4D;color:${scoreColor(Vm.score)}">${okCount}/13 campos · ${Vm.errores.length} hallazgos</span>
     </div>
    </div>
   </div>
@@ -921,45 +1040,54 @@ function renderManifiesto(){
    <div class="glass" style="padding:20px">
     <h2 style="font-size:15px;font-weight:600;margin-bottom:14px">Datos extraídos</h2>
     <div style="display:grid;gap:14px;grid-template-columns:1fr 1fr">
-     ${kv('Tipo',m.tipo)}${kv('Fecha de pago',m.fechaPago)}
-     ${kv('Remitente',m.remitente)}${kv('Destinatario',m.destinatario)}
-     ${kv('Vehículo',m.vehiculo)}${kv('Poseedor/tenedor',m.poseedor)}
-     ${kv('Conductor',m.conductor)}${kv('Seguro',m.seguro)}
-     ${kv('Mercancía',m.mercancia)}${kv('Peso',m.peso)}
-     ${kv('Cargue pagado por',m.carguePor)}${kv('Descargue pagado por','<span style="color:#e05252">'+m.descarguePor+'</span>')}
+     ${kv('Tipo',esc(m.tipo))}${kv('Fecha de pago',esc(m.fechaPago))}
+     ${kv('Remitente',esc(m.remitente))}${kv('Destinatario',esc(m.destinatario))}
+     ${kv('Vehículo',esc(m.vehiculo))}${kv('Poseedor/tenedor',esc(m.poseedor))}
+     ${kv('Conductor',esc(m.conductor))}${kv('Seguro',esc(m.seguro))}
+     ${kv('Mercancía',esc(m.mercancia))}${kv('Peso',esc(m.peso))}
+     ${kv('Cargue pagado por',vacio(m.carguePor)?'<span style="color:#e05252">'+esc(m.carguePor)+'</span>':esc(m.carguePor))}${kv('Descargue pagado por',vacio(m.descarguePor)?'<span style="color:#e05252">'+esc(m.descarguePor)+'</span>':esc(m.descarguePor))}
     </div>
     <div class="glass-gold" style="padding:12px;margin-top:14px;display:flex;justify-content:space-between;align-items:center">
-     <div><p style="font-size:11px;color:var(--muted);text-transform:uppercase">Valor total del viaje</p><p style="font-size:18px;font-weight:700">${COP(m.valorTotal)}</p><p style="font-size:11px;color:var(--muted)">${m.valorLetras}</p></div>
-     <div style="text-align:right"><p style="font-size:11px;color:var(--muted);text-transform:uppercase">Retención ICA</p><p style="font-size:18px;font-weight:700;color:#e05252">${COP(m.ica)}</p></div>
+     <div><p style="font-size:11px;color:var(--muted);text-transform:uppercase">Valor total del viaje</p><p style="font-size:18px;font-weight:700">${m.valorTotal!=null?COP(m.valorTotal):'—'}</p><p style="font-size:11px;color:var(--muted)">${esc(m.valorLetras)}</p></div>
+     <div style="text-align:right"><p style="font-size:11px;color:var(--muted);text-transform:uppercase">Retención ICA</p><p style="font-size:18px;font-weight:700;color:${m.ica===0?'#e05252':'var(--fg)'}">${m.ica!=null?COP(m.ica):'—'}</p></div>
     </div>
    </div>
    <div class="glass" style="padding:20px">
     <h2 style="font-size:15px;font-weight:600;margin-bottom:6px">Campos obligatorios</h2>
     <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Decreto 1079 de 2015, art. 2.2.1.7.5.4</p>
-    ${manifiestoCampos.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 0">
-      <span style="display:flex;height:20px;width:20px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;background:${c.ok?'rgba(46,204,113,.15)':'rgba(224,82,82,.15)'};color:${c.ok?'#2ecc71':'#e05252'}">${c.ok?'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'}</span>
-      <span style="font-size:12px;color:${c.ok?'var(--fg)':'#e05252'};font-weight:${c.ok?'400':'600'}">${c.n}. ${c.t}</span></div>`).join('')}
+    ${Vm.campos.map(c=>{const col=c.ok?'#2ecc71':c.parcial?'#d4871a':'#e05252';return `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0">
+      <span style="display:flex;height:20px;width:20px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;background:${col}26;color:${col}">${c.ok?'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':c.parcial?'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="6" x2="18" y1="12" y2="12"/></svg>':'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'}</span>
+      <span style="font-size:12px;color:${c.ok?'var(--fg)':col};font-weight:${c.ok?'400':'600'}">${c.n}. ${esc(c.t)}${c.nota&&!c.ok?`<span style="display:block;font-weight:400;font-size:11px;color:var(--muted)">Falta: ${esc(c.nota)}</span>`:''}</span></div>`}).join('')}
    </div>
   </div>
 
   <h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Hallazgos y correcciones</h2>
   <div style="display:flex;flex-direction:column;gap:12px">
-   ${manifiestoErrores.map(e=>`<div class="glass-finding" style="padding:16px;border-left:4px solid ${riskColor(e.risk)}">
+   ${Vm.errores.length?'':`<div class="glass" style="padding:18px;font-size:13px;color:var(--muted)">El manifiesto no presenta hallazgos frente a las reglas verificadas.</div>`}
+   ${Vm.errores.map(e=>`<div class="glass-finding" style="padding:16px;border-left:4px solid ${riskColor(e.risk)}">
      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <span class="badge-pill" style="background:${riskBg(e.risk)};color:${riskColor(e.risk)};border:1px solid ${riskColor(e.risk)}55">Riesgo ${e.risk[0].toUpperCase()+e.risk.slice(1)}</span>
-      <span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${e.base}</span></div>
-     <h3 style="font-size:14px;font-weight:600">${e.t}</h3>
-     <p style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6">${e.detalle}</p>
+      ${e.url?`<a class="badge-pill" href="${esc(e.url)}" target="_blank" rel="noopener" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px;text-decoration:underline;text-underline-offset:2px">${esc(e.base)}</a>`:`<span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${esc(e.base)}</span>`}</div>
+     <h3 style="font-size:14px;font-weight:600">${esc(e.t)}</h3>
+     <p style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6">${esc(e.detalle)}</p>
      <div style="display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-top:12px" class="grid-diff">
-      <div class="diff-col diff-old"><p style="font-size:11px;font-weight:700;color:#e05252;margin-bottom:4px">EN EL MANIFIESTO</p>${e.actual}</div>
-      <div class="diff-col diff-new"><p style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:4px">CORRECCIÓN SUGERIDA</p>${e.sugerido}</div>
+      <div class="diff-col diff-old"><p style="font-size:11px;font-weight:700;color:#e05252;margin-bottom:4px">EN EL MANIFIESTO</p>${esc(e.actual)}</div>
+      <div class="diff-col diff-new"><p style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:4px">CORRECCIÓN SUGERIDA</p>${esc(e.sugerido)}</div>
      </div>
     </div>`).join('')}
   </div>
+  ${MANIF_HIST.length?`<h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Historial de manifiestos</h2>
+  <div class="glass" style="padding:8px 16px">${MANIF_HIST.map(h=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(37,75,89,.06)">
+    <span style="width:18px;height:18px;display:inline-flex;color:${h.activo?'#EABC1F':'var(--muted)'}">${I.file}</span>
+    <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:600">N.º ${esc(h.numero||'—')} <span style="font-weight:400;color:var(--muted)">· ${esc(h.archivo_nombre||'')}</span></p>
+     <p style="font-size:11px;color:var(--muted)">${hace(h.created_at)} · ${h.n_hallazgos} hallazgos</p></div>
+    <span style="font-size:15px;font-weight:700;font-family:monospace;color:${scoreColor(Number(h.score))}">${Number(h.score).toFixed(1)}</span>
+    ${h.activo?`<span class="badge-pill" style="background:rgba(234,188,31,.14);color:#C9A018">En revisión</span>`:`<button class="glass-pill" onclick="verManifiesto('${h.id}')">Ver</button>`}
+   </div>`).join('')}</div>`:''}
   <div class="glass-security" style="padding:16px;margin-top:20px">
    <div style="display:flex;align-items:center;justify-content:center;gap:24px;font-size:12px;color:var(--muted);flex-wrap:wrap">
-    <span style="display:flex;align-items:center;gap:8px"><span style="color:#2ecc71;width:16px;height:16px;display:inline-flex">${I.shield}</span>Análisis local</span>
-    <span style="display:flex;align-items:center;gap:8px"><span style="color:#EABC1F;width:16px;height:16px;display:inline-flex">${I.lock}</span>Datos anonimizados</span>
+    <span style="display:flex;align-items:center;gap:8px"><span style="color:#2ecc71;width:16px;height:16px;display:inline-flex">${I.shield}</span>Extracción con IA · reglas verificadas en código</span>
+    <span style="display:flex;align-items:center;gap:8px"><span style="color:#EABC1F;width:16px;height:16px;display:inline-flex">${I.lock}</span>Documentos en almacenamiento privado</span>
     <span>Verificado contra el Decreto 1079 de 2015</span>
    </div>
   </div>`;
@@ -1031,7 +1159,7 @@ const st=document.createElement('style');st.textContent='@keyframes bounce{0%,10
 initStatic();
 renderDashboard();renderNormativa();renderContratos();renderManifiesto();renderChat();updateSideScore();
 go('dashboard');
-cargarPanel();cargarNormas();
+cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();
 
 /* logout real: borra la cookie de sesión en el servidor */
 function logout(){fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}

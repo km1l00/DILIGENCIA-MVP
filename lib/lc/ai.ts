@@ -68,15 +68,32 @@ export async function jsonCall<T extends z.ZodTypeAny>(opts: {
 }): Promise<{ data: z.infer<T>; model: string }> {
   const model = opts.model || MODEL
   const jsonSchema = closeObjects(z.toJSONSchema(opts.schema)) as Record<string, unknown>
+  // Structured outputs admite hasta 16 parámetros con uniones (anulables); con más, se pide el JSON por instrucción.
+  const uniones = (JSON.stringify(jsonSchema).match(/"anyOf"/g) || []).length
+  const estructurado = uniones <= 16
   const params: Record<string, unknown> = {
     model,
     max_tokens: opts.maxTokens ?? 8000,
-    system: opts.system,
+    system: estructurado ? opts.system : opts.system + '\n\nResponde ÚNICAMENTE con un objeto JSON válido que cumpla este JSON Schema, sin texto adicional:\n' + JSON.stringify(jsonSchema),
     messages: [{ role: 'user', content: opts.content }],
-    output_config: { format: { type: 'json_schema', schema: jsonSchema }, ...(isHaiku(model) ? {} : { effort: opts.effort ?? 'medium' }) },
+    output_config: {
+      ...(estructurado ? { format: { type: 'json_schema', schema: jsonSchema } } : {}),
+      ...(isHaiku(model) ? {} : { effort: opts.effort ?? 'medium' }),
+    },
   }
+  if (Object.keys(params.output_config as object).length === 0) delete params.output_config
   await verificarCupo()
-  const msg = (await claude().messages.create(params as unknown as Anthropic.MessageCreateParamsNonStreaming, { timeout: opts.timeoutMs ?? 120_000 })) as Anthropic.Message
+  let msg: Anthropic.Message
+  try {
+    msg = (await claude().messages.create(params as unknown as Anthropic.MessageCreateParamsNonStreaming, { timeout: opts.timeoutMs ?? 120_000 })) as Anthropic.Message
+  } catch (e) {
+    // Si el modelo no admite salidas estructuradas, se pide el JSON por instrucción y se valida igual con zod.
+    if (!(e instanceof Anthropic.BadRequestError)) throw e
+    console.warn('[claude] structured outputs rechazado, reintento con JSON por prompt:', e.message)
+    delete (params as { output_config?: unknown }).output_config
+    params.system = opts.system + '\n\nResponde ÚNICAMENTE con un objeto JSON válido que cumpla este JSON Schema, sin texto adicional:\n' + JSON.stringify(jsonSchema)
+    msg = (await claude().messages.create(params as unknown as Anthropic.MessageCreateParamsNonStreaming, { timeout: opts.timeoutMs ?? 120_000 })) as Anthropic.Message
+  }
   logUsage(opts.tag, msg)
   await registrarUso(opts.tag, msg.model, msg.usage.input_tokens, msg.usage.output_tokens, msg.stop_reason !== 'refusal')
   if (msg.stop_reason === 'refusal') throw new Error('El modelo declinó la solicitud')

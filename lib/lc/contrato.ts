@@ -48,6 +48,16 @@ export function parseClausulas(texto: string): { encabezado: string; clausulas: 
   }
 }
 
+// Quita el ordinal y el título que a veces antepone el modelo ("CUARTA. SEGUROS. texto" -> "texto").
+export function limpiarCuerpo(body: string, nombre?: string | null): string {
+  let s = body.trim().replace(new RegExp(`^(?:CL[AÁ]USULA\\s+)?(?:${ORD.slice().reverse().join('|')})\\s*[.:\\-–]\\s*`, 'i'), '')
+  if (nombre) {
+    const n = nombre.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    s = s.replace(new RegExp(`^${n}\\s*[.:\\-–]\\s*`, 'i'), '')
+  }
+  return s.trim()
+}
+
 const key = (s: string | null | undefined) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, '').trim()
 
 // Aplica hallazgos sobre las cláusulas originales. `soloImplementados`=true → versión vigente; false → versión con todos los cambios propuestos.
@@ -57,8 +67,10 @@ export function aplicarHallazgos(originales: { nombre: string; body: string }[],
   const nuevas: Clausula[] = []
   for (const h of usar) {
     const target = h.reemplaza ? out.findIndex((c) => key(c.nombre) === key(h.reemplaza)) : -1
-    if (target >= 0) out[target] = { nombre: h.clausula_titulo || out[target].nombre, body: h.new_text, status: 'mod', hallazgo: h.codigo }
-    else nuevas.push({ nombre: h.clausula_titulo || h.area || 'CLÁUSULA NUEVA', body: h.new_text, status: 'new', hallazgo: h.codigo })
+    const nombre = h.clausula_titulo || (target >= 0 ? out[target].nombre : h.area || 'CLÁUSULA NUEVA')
+    const body = limpiarCuerpo(h.new_text, nombre)
+    if (target >= 0) out[target] = { nombre, body, status: 'mod', hallazgo: h.codigo }
+    else nuevas.push({ nombre, body, status: 'new', hallazgo: h.codigo })
   }
   // Las cláusulas nuevas van antes de las de cierre (duración, vigencia, domicilio, notificaciones), si existen.
   const cierre = out.findIndex((c) => /DURACION|VIGENCIA|PERFECCIONAMIENTO|DOMICILIO|NOTIFICACION|ACUERDO INTEGRAL/.test(key(c.nombre)))

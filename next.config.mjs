@@ -22,6 +22,9 @@ const nextConfig = {
     unoptimized: true,
   },
   poweredByHeader: false, // Oculta la cabecera X-Powered-By
+  // El logo se embebe en los PDF/Word exportados: incluirlo en el bundle de las funciones.
+  outputFileTracingIncludes: { '/api/lc/**': ['./public/logo-emblem.png'] },
+  serverExternalPackages: ['unpdf', 'mammoth'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },

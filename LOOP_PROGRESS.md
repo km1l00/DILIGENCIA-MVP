@@ -20,23 +20,23 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | N4 | Modal de norma (resumen, puntos, impacto, enlace) | verificado-prod | Modal "Decreto 1017 de 2025": entidad, tipo, fecha, vigencia, tema, resumen, 4 puntos, impacto, Ver texto oficial |
 | N5 | Boletín semanal con Claude desde la BD, guardado | pendiente | |
 | N6 | Exportar boletín a PDF y Word (descarga real) | pendiente | |
-| C1 | Cargar contrato PDF/DOCX (upload + extracción en servidor) | pendiente | |
-| C2 | Análisis con Claude (cláusulas, hallazgos, faltantes, redacción, score 1–5) persistido | pendiente | |
-| C3 | Ver original y comparación original vs. mejorada | pendiente | |
-| C4 | "Implementar" actualiza contrato, recalcula score, persiste, panel se actualiza | pendiente | |
-| C5 | Exportar contrato mejorado a Word/PDF | pendiente | |
-| C6 | Analizar contrato nuevo y cambiar entre contratos | pendiente | |
-| M1 | Cargar manifiesto PDF y extraer datos con Claude | pendiente | |
-| M2 | Campos obligatorios (Decreto 1079/2015) verificados en código, hallazgos citando norma real | pendiente | |
-| M3 | Score del manifiesto persistido y reflejado en el panel | pendiente | |
-| M4 | "Cargar otro manifiesto" + historial guardado | pendiente | |
+| C1 | Cargar contrato PDF/DOCX (upload + extracción en servidor) | verificado-prod | Upload DOCX real (fixture) → POST /api/lc/contratos: texto extraído con mammoth (PDF con unpdf probado en local: 8 cláusulas en ambos), original guardado en Storage lc-docs y descargable (GET …/original 200, 37.666 bytes) |
+| C2 | Análisis con Claude (cláusulas, hallazgos, faltantes, redacción, score 1–5) persistido | verificado-prod | Opus 5.5: 7 hallazgos (alto/medio/bajo), 2 cláusulas nuevas, 5 modificadas, fundamentos reales (C.Co. 981/982/992, C.C. 1592-1601, D.1079 arts. 2.2.1.7.4/6.8/6.9, Ley 1563), score 1.8 persistido en lc_contratos + lc_contrato_hallazgos. 4.720 in / 7.702 out tokens |
+| C3 | Ver original y comparación original vs. mejorada | verificado-prod | "Ver contrato analizado" (texto extraído), "Ver contrato con cambios propuestos" (NUEVA/MODIFICADA), diff por hallazgo CLÁUSULA ACTUAL vs REDACCIÓN PROPUESTA; se corrigió el prefijo duplicado de ordinal/título (limpiarCuerpo) |
+| C4 | "Implementar" actualiza contrato, recalcula score, persiste, panel se actualiza | verificado-prod | Implementar C4: score 1.8→2.2 (+0.4) recalculado en servidor, persiste tras recargar, panel 2.4→2.6, sideScore sincronizado, evento "Cláusula implementada…" |
+| C5 | Exportar contrato mejorado a Word/PDF | verificado-prod | GET …/export?format=docx → 200 DOCX (PK, 119.835 B); format=pdf → 200 %PDF (135.801 B); version=vigente → PDF 129.922 B; content-disposition attachment |
+| C6 | Analizar contrato nuevo y cambiar entre contratos | verificado-prod | Selector de contratos (2): cambiarContrato → activo=seed (2.6, 5 hallazgos), panel recalculado a 2.8 |
+| M1 | Cargar manifiesto PDF y extraer datos con Claude | verificado-prod | Upload PDF (fixture ficticio) → Haiku extrae datos (10,4 s); 01278713 extraído en local idéntico al seed |
+| M2 | Campos obligatorios (Decreto 1079/2015) verificados en código, hallazgos citando norma real | verificado-prod | Reglas en código: N9 letras≠números, N10 >5 días hábiles tras cumplido, 8 h cargue (11,5 h), descargue a cargo de la empresa de transporte, SICE-TAC; 13 campos con faltantes; cada hallazgo con artículo y enlace oficial |
+| M3 | Score del manifiesto persistido y reflejado en el panel | verificado-prod | Score 1.5 persistido; panel 2.8→2.1 (promedio con contrato 2.6); KPIs manifiestos=2 |
+| M4 | "Cargar otro manifiesto" + historial guardado | verificado-prod | "Cargar otro manifiesto" + historial (99000123 activo, 01278713); "Ver" reactiva 01278713 y el panel vuelve a 2.8 |
 | A1 | Chat Claude real (streaming), historial persistido, markdown | pendiente | |
 | A2 | Acciones rápidas van a la API | pendiente | |
 | A3 | System prompt F&AA + contexto BD (normas, contrato y manifiesto activos) | pendiente | |
 | A4 | "Preguntar al asistente" desde modal de norma con contexto | pendiente | |
 | T1 | Logout real + /api protegidas (401 sin cookie) | verificado-prod | Sin cookie: /api/lc/panel, /api/lc/normas, /api/chat → 401 JSON; /inicio → 307 a /. Logout: DELETE /api/acceso → /, luego /api/lc/panel 401 |
 | T2 | Sin errores de consola ni requests fallidos en prod | pendiente | |
-| T3 | Fixtures (contrato Grupo NF / Ingenio Providencia, manifiesto 01278713) | pendiente | |
+| T3 | Fixtures (contrato Grupo NF / Ingenio Providencia, manifiesto 01278713) | verificado-prod | fixtures/ (contrato .docx/.pdf, manifiesto-01278713.pdf, manifiesto-prueba-ficticio.pdf rotulado) servidos tras la cookie en /fixtures (sin cookie → 307) y usados en los uploads de prod |
 | R  | Regresión final completa | pendiente | |
 
 ## Decisiones / cambios pedidos por el usuario
@@ -47,3 +47,4 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | Iteración | Llamadas | Tokens aprox. | Costo aprox. |
 |---|---|---|---|
 | 1 (setup) | 1× Haiku (validación key) | ~15 | < $0.001 |
+| 2 (manifiestos + contratos) | 3× Haiku (extracción) + 1× Opus 5.5 (análisis contrato) | Haiku 12,6k in / 2,6k out · Opus 4,7k in / 7,7k out | ~$0,20 |
