@@ -35,9 +35,9 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | A3 | System prompt F&AA + contexto BD (normas, contrato y manifiesto activos) | verificado-prod | Respuesta cita solo normas de lc_normas con su URL oficial (Decreto 1017/2025 i=264276, Decreto 1079/2015 i=77889) y usa contrato activo (hallazgo C3) y manifiesto 01278713 (campos vacíos). Se afinó el hecho del art. 2.2.1.7.6.8 (quién paga las horas adicionales) |
 | A4 | "Preguntar al asistente" desde modal de norma con contexto | verificado-prod | Modal Resolución 40595 de 2022 → "Preguntar al asistente" abre el chat con chip "Contexto: Resolución 40595 de 2022" y respuesta sobre el PESV enfocada en el generador |
 | T1 | Logout real + /api protegidas (401 sin cookie) | verificado-prod | Sin cookie: /api/lc/panel, /api/lc/normas, /api/chat → 401 JSON; /inicio → 307 a /. Logout: DELETE /api/acceso → /, luego /api/lc/panel 401 |
-| T2 | Sin errores de consola ni requests fallidos en prod | pendiente | |
+| T2 | Sin errores de consola ni requests fallidos en prod | verificado-prod | Pestaña limpia: todos los módulos, 0 mensajes de consola, todas las /api/lc/* en 200. El 401 visto antes era residuo de la prueba de logout. Se detectó POST /api/lc/chat marcado ERR_ABORTED al leer el stream con ReadableStream (reproducido con y sin AbortController); se cambió a XHR + onprogress: 93 renders progresivos, 200 sin fallo |
 | T3 | Fixtures (contrato Grupo NF / Ingenio Providencia, manifiesto 01278713) | verificado-prod | fixtures/ (contrato .docx/.pdf, manifiesto-01278713.pdf, manifiesto-prueba-ficticio.pdf rotulado) servidos tras la cookie en /fixtures (sin cookie → 307) y usados en los uploads de prod |
-| R  | Regresión final completa | pendiente | |
+| R  | Regresión final completa | verificado-prod | Regresión de punta a punta tras logout → botón de entrada: panel (KPIs 6·2·2·11, 2.8), filtros (7 de 18), modal, upload manifiesto 01278713 (2.9, 6 hallazgos, historial 3), implementar C1 (2.6→3.2, panel 3.1), export contrato PDF y boletín DOCX 200, chat con quick action (respuesta real). Resiliencia: con fetch/XHR caídos el panel conserva datos y el chat usa respaldo con aviso. Artifact republicado (v13) en modo demo |
 
 ## Decisiones / cambios pedidos por el usuario
 - 26/09: login de un solo botón (sin usuario/contraseña; usuario fijo franco.admin en el servidor). Se mantiene la cookie de sesión; se añadió tope diario de IA (`IA_TOPE_DIARIO`, 150) y registro de tokens en `lc_ia_uso`. Aviso dado: esto no es autenticación.
@@ -53,4 +53,5 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | 1 (setup) | 1× Haiku (validación key) | ~15 | < $0.001 |
 | 2 (manifiestos + contratos) | 3× Haiku (extracción) + 1× Opus 5.5 (análisis contrato) | Haiku 12,6k in / 2,6k out · Opus 4,7k in / 7,7k out | ~$0,20 |
 | 3 (asistente + normativa + boletín) | chat 2× Opus · normativa 2× Opus + 2× Haiku (web_search 20 búsquedas) · boletín 1× Opus | Opus 316k in / 15k out · Haiku ~100k in / 4k out | ~$1,85 (normativa con Opus ≈ $1,40) |
-| **Total acumulado** | | | **≈ $2,10** |
+| 4 (regresión) | 1× Haiku manifiesto · 4× Opus chat (pruebas de streaming) · 1× Haiku normativa | ~70k in / 4k out | ~$0,20 |
+| **Total acumulado (medido en lc_ia_uso)** | 19 llamadas + 20 búsquedas web | | **≈ $2,40** ($2,22 tokens + ~$0,20 búsquedas; normativa con Opus fue $1,53) |

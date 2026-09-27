@@ -1179,16 +1179,21 @@ async function sendChat(text){
  if(!text||!text.trim()||chatLoading)return;
  const q=text.trim();
  chatMsgs.push({role:'user',content:q,at:new Date().toISOString(),norma:chatNorma});chatLoading=true;renderChat();
- const ctl=new AbortController();let primer=false;
- const to=setTimeout(()=>{if(!primer)ctl.abort();},25000);
+ let primer=false,xhr=null;
  const msg={role:'assistant',content:'',at:new Date().toISOString(),norma:chatNorma,stream:true};
  try{
-  const r=await fetch('/api/lc/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mensaje:q,norma:chatNorma}),signal:ctl.signal,credentials:'same-origin'});
-  if(r.status===401&&location.protocol.startsWith('http')){location.href='/';return;}
-  if(!r.ok||!r.body){let e='Error '+r.status;try{e=(await r.json()).error||e}catch(_){}throw new Error(e);}
-  chatMsgs.push(msg);
-  const rd=r.body.getReader(),dec=new TextDecoder();
-  while(true){const {done,value}=await rd.read();if(done)break;primer=true;msg.content+=dec.decode(value,{stream:true});renderChatPronto();}
+  // XHR con onprogress: streaming del texto y cierre limpio de la petición
+  await new Promise((ok,ko)=>{
+   xhr=new XMLHttpRequest();xhr.open('POST','/api/lc/chat');xhr.setRequestHeader('content-type','application/json');xhr.withCredentials=true;
+   const to=setTimeout(()=>{if(!primer){xhr.abort();ko(new Error('Sin respuesta del asistente'));}},25000);
+   xhr.onprogress=()=>{if(xhr.status!==200)return;if(!primer){primer=true;chatMsgs.push(msg);}msg.content=xhr.responseText;renderChatPronto();};
+   xhr.onload=()=>{clearTimeout(to);
+    if(xhr.status===401&&location.protocol.startsWith('http')){location.href='/';return ko(new Error('Sesión vencida'));}
+    if(xhr.status!==200){let e='Error '+xhr.status;try{e=JSON.parse(xhr.responseText).error||e}catch(_){}return ko(new Error(e));}
+    if(!primer){primer=true;chatMsgs.push(msg);}msg.content=xhr.responseText;ok();};
+   xhr.onerror=()=>{clearTimeout(to);ko(new Error('Error de red'));};
+   xhr.send(JSON.stringify({mensaje:q,norma:chatNorma}));
+  });
   if(msg.content.includes('⟦error⟧')){msg.content=msg.content.replace('⟦error⟧','').trim()||'No fue posible completar la respuesta. Intente de nuevo.';}
  }catch(e){
   console.warn('[chat respaldo]',e&&e.message);
@@ -1196,7 +1201,7 @@ async function sendChat(text){
   const pre=chatResponses[q];
   chatMsgs.push({role:'assistant',content:pre||'No fue posible conectar con el asistente en este momento. Intente de nuevo en unos segundos.',at:new Date().toISOString(),respaldo:!!pre});
   aviso(pre?'El asistente no respondió a tiempo: se muestra una respuesta de respaldo.':'No fue posible conectar con el asistente.',pre?undefined:'error');
- }finally{clearTimeout(to);msg.stream=false;chatLoading=false;renderChat();}
+ }finally{msg.stream=false;chatLoading=false;renderChat();}
 }
 
 const st=document.createElement('style');st.textContent='@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}';document.head.appendChild(st);
@@ -1208,7 +1213,7 @@ go('dashboard');
 cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();cargarChat();cargarBoletin();
 
 /* logout real: borra la cookie de sesión en el servidor */
-function logout(){fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}
+function logout(){if(!PANEL&&!normasDesdeBD){aviso('Modo demostración: no hay una sesión de servidor que cerrar.');return;}fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}
 window.showLogin=logout;
 </script>
 <style>

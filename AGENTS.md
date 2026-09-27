@@ -13,25 +13,32 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Lo que se está construyendo hoy NO es el MVP marítimo de construcción de abajo, sino una **demo para evento** del sector **transporte de carga**.
 
 - **Producto/marca:** "**Logicompliance**" — plataforma de Legal Intelligence. Cliente y logo: **Franco & Abogados Asociados (F&AA)**, globo dorado a color (embebido en base64 como `LOGO_EMBLEM`). El *due diligence* va dirigido al **generador** de carga (no a la empresa de transporte).
-- **Es una DEMO:** ejemplos **hardcodeados** que simulan que funciona; debe verse **llamativa y "vender"** en el evento.
+- **Ya es REAL (26/09/2026, rama `feat/real`):** los 5 módulos leen y escriben en Supabase y usan Claude. Los datos del demo en `app.html` quedaron solo como **respaldo** (si la API falla o tarda, se muestran con un aviso discreto). Seguimiento en `LOOP_PROGRESS.md`.
 - **Terminología:** usar SIEMPRE **"empresa de transporte"**, nunca "transportador".
 - **Normas:** deben ser **REALES con enlace oficial** (funcionpublica.gov.co, normograma DIAN, mintransporte, invias, supertransporte). Nunca inventar números de decreto/resolución.
-- **Gauge de score:** escala **rojo/naranja/verde** con aguja navy + número tabular debajo + etiqueta de riesgo (institucional pero con la escala de color). Score del panel = **promedio** de contrato y manifiesto (dinámico).
+- **Gauge de score:** escala **rojo/naranja/verde** con aguja navy + número tabular debajo + etiqueta de riesgo. Score del panel = **promedio** real del contrato activo y del manifiesto activo (desde la BD).
 - **Texto:** que **no parezca IA**; "due diligence" en minúscula como concepto, "Logicompliance" solo como marca.
 
-### Arquitectura de la demo (2 superficies, una sola fuente)
-- **`app.html` (raíz) = FUENTE DE VERDAD** del demo: login overlay + 5 módulos (Panel, Actualización Normativa, Revisión de Contratos, Análisis de Manifiesto, Asistente IA). Todo el contenido y el logo viven aquí.
-- Con Python se **regeneran** desde `app.html`:
-  - **`app/inicio/content.ts`** (`export const DEMO_HTML`) para servir la demo protegida en Vercel — con el login overlay OCULTO (`class="login-screen hidden"`), sin el `<video>` del login, y el logout cambiado a `fetch('/api/acceso',{method:'DELETE'})`.
-  - **`diligencia-demo.html`** para el **Artifact privado** (title `Logicompliance`).
-- **Pipeline tras CUALQUIER cambio en `app.html`:** regenerar `content.ts` + `diligencia-demo.html` → `npx vercel --prod --yes` → **republicar el Artifact** (mismo file path).
+### Arquitectura (una sola fuente, dos superficies)
+- **`app.html` (raíz) = FUENTE DE VERDAD del front**: 5 módulos que hacen `fetch`/XHR a `/api/lc/*` (sin login falso en el cliente).
+- `python scripts/build_demo.py` regenera desde `app.html`:
+  - **`app/inicio/content.ts`** (`export const DEMO_HTML`) → servido en `/inicio` detrás del cookie-gate.
+  - **`diligencia-demo.html`** → **Artifact privado en MODO DEMO**: es estático, no tiene backend; cada llamada a la API falla y se usan los datos de respaldo con aviso. No exporta ni analiza de verdad.
+- **Pipeline tras CUALQUIER cambio en `app.html`:** `python scripts/build_demo.py` → `npm run build` → `npx vercel --prod --yes` → republicar el Artifact (mismo file path).
+- **Backend** (`app/api/lc/*`, lógica en `lib/lc/*`), todas las rutas exigen la cookie `fa_session`:
+  - `panel` (KPIs, actividad, scores) · `normas` (lista) · `normas/analizar` (web_search de Claude SOLO en dominios oficiales; el código exige URL de los resultados, dominio oficial, HTTP 200 y el número de la norma en el documento; dedupe por número+año) · `boletin` (+ `/[id]/export?format=pdf|docx`)
+  - `contratos` (upload PDF/DOCX → texto con unpdf/mammoth → análisis Claude → persistencia; original en Storage `lc-docs`), `contratos/[id]` (detalle), `/implementar`, `/activar`, `/export?format&version=propuesta|vigente`, `/original`
+  - `manifiestos` (upload PDF → extracción Claude/Haiku → **reglas jurídicas en código** `lib/lc/manifiesto.ts`), `manifiestos/[id]`, `/activar`
+  - `chat` (GET historial; POST streaming text/plain, contexto = normas de la BD + contrato y manifiesto activos + norma en foco)
+- **BD Supabase** (`hpesrooroyaehpjdxoll`, pooler `aws-1-sa-east-1`): tablas `lc_*` (normas, boletines, contratos, contrato_hallazgos, manifiestos, eventos, chat, ia_uso) creadas con `npx tsx scripts/migrate.mts` (lee `db/migrations/*.sql`, idempotente). Seed: `scripts/seed.mts` (desde app.html) y `scripts/seed-marco.mts`. RLS sin políticas: solo service_role. Las tablas del MVP viejo no se tocan.
+- **Reglas del manifiesto verificadas contra el texto oficial:** art. 2.2.1.7.5.4 (13 numerales; num. 9-11 modificados por el art. 10 del Decreto 1017/2025: pago ≤ 5 días hábiles tras el cumplido), art. 2.2.1.7.6.8 (8 h; modificado por el art. 15; antes 12 h), art. 2.2.1.7.6.9 num. 2 lit. b, art. 2.2.1.7.4 (piso SICE-TAC). Se aplica el régimen según la fecha de expedición. ICA en $0 = criterio F&AA (se rotula así, no hay norma nacional). funcionpublica escribe "Decreto 2017 de 2025" en las notas de vigencia: es una errata, es el 1017.
+- **IA:** `ANTHROPIC_MODEL` (Opus 5.5: contratos, chat, boletín), `ANTHROPIC_MODEL_FAST` (Haiku 4.5: extracción de manifiestos), `ANTHROPIC_MODEL_NORMATIVA` (default Haiku: la búsqueda web suma 50-150k tokens por corrida). Tope diario `IA_TOPE_DIARIO` (150) y tokens registrados en `lc_ia_uso`. Leer respuestas uniendo bloques `text`.
+- **Fixtures** en `fixtures/` (y copia en `public/fixtures/`, detrás de la cookie): contrato Grupo NF/Ingenio Providencia (.docx/.pdf), manifiesto 01278713, manifiesto ficticio rotulado. `python scripts/make_fixtures.py` los regenera.
 
-### Seguridad (Vercel) — patrón que funciona
-- **Cookie-gate, NO Basic Auth.** Vercel elimina la cabecera `WWW-Authenticate` de las respuestas del middleware, así que el navegador no muestra el prompt nativo. Se usa página de login propia + cookie de sesión.
-- `middleware.ts`: `/` (login) y `/api/acceso` son públicos; todo lo demás exige `cookie fa_session === GATE_TOKEN`, si no → redirect a `/`. Comparación en **tiempo constante**.
-- `app/api/acceso/route.ts`: `POST` verifica `BASIC_AUTH_USER`/`BASIC_AUTH_PASS` (env) y setea cookie `fa_session` (`httpOnly`+`Secure`+`SameSite=Lax`); `DELETE` cierra sesión.
-- `app/(...)/page.tsx` = login con **video del camión** (`public/Truck_cruising_down_highway_...mp4`) → `POST /api/acceso` → redirige a **`/inicio`** (que sirve la demo).
-- **Env en Vercel:** `BASIC_AUTH_USER=franco.admin`, `BASIC_AUTH_PASS` (fuerte), `GATE_TOKEN` (secreto aleatorio). Cabeceras de seguridad en `next.config.mjs` (HSTS, X-Frame-Options DENY, CSP `frame-ancestors 'none'`, nosniff, referrer, permissions, `poweredByHeader:false`).
+### Seguridad (Vercel)
+- **Cookie-gate, NO Basic Auth** (Vercel elimina `WWW-Authenticate`). `proxy.ts` (antes `middleware.ts`; Next 16): `/` y `/api/acceso` públicos; lo demás exige `fa_session === GATE_TOKEN` → páginas redirigen a `/`, `/api/*` responde **401 JSON**. Comparación en tiempo constante.
+- **Login de un solo botón (pedido por el usuario, 26/09):** `POST /api/acceso` entra sin usuario/contraseña (usuario fijo `franco.admin`). Esto **no es autenticación**: cualquiera con la URL entra; por eso existe el tope diario de IA. `DELETE /api/acceso` cierra sesión.
+- Env en Vercel: `GATE_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_MODEL_FAST`, `NEXT_PUBLIC_SUPABASE_*` (`BASIC_AUTH_*` ya no se usan). Cabeceras de seguridad en `next.config.mjs`.
 - **URLs:** producción `https://diligencia-mvp.vercel.app` (cuenta `kamilosanabria05-4909`, org `daniels-projects`); Artifact privado `https://claude.ai/artifact/Az67Fti1vfaXYgLu2TvNnn`.
 
 ### Cómo NO parece IA / errores a no repetir
