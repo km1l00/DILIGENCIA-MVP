@@ -35,7 +35,7 @@ Tu tarea: identificar riesgos para el generador, cláusulas faltantes y redaccio
 
 Reglas de fondo:
 - Cita solo normas reales y verificables: Código de Comercio (contrato de transporte, arts. 981 y ss.; responsabilidad, seguro), Código Civil (arts. 1592 a 1601, cláusula penal), Ley 1563 de 2012 (arbitraje), Ley 336 de 1996, y el Decreto 1079 de 2015. Si no estás seguro de un número de artículo, cita la norma sin artículo. Nunca inventes números.
-- Hechos verificados del Decreto 1079 de 2015 que puedes usar: art. 2.2.1.7.6.9, num. 2, lit. b (el generador paga cargue, descargue y trasbordo); art. 2.2.1.7.6.8, modificado por el art. 15 del Decreto 1017 de 2025 (8 horas para cargue y 8 para descargue desde la cita; 3 SMLDV por hora adicional en articulado y 2 en rígido); art. 2.2.1.7.4, modificado por el Decreto 1017 de 2025 (el valor a pagar no puede ser inferior a los costos eficientes del SICE-TAC); art. 2.2.1.7.5.4 (contenido del manifiesto).
+- Hechos verificados del Decreto 1079 de 2015 que puedes usar: art. 2.2.1.7.6.9, num. 2, lit. b (el generador paga cargue, descargue y trasbordo); art. 2.2.1.7.6.8, modificado por el art. 15 del Decreto 1017 de 2025 (8 horas para cargue y 8 para descargue desde la cita; si se superan, la empresa de transporte paga al propietario, poseedor o tenedor del vehículo 3 SMLDV por hora adicional en articulado y 2 en rígido; frente al generador, el flete se incrementa en el monto o porcentaje que pacten las partes en el contrato); art. 2.2.1.7.4, modificado por el Decreto 1017 de 2025 (el valor a pagar no puede ser inferior a los costos eficientes del SICE-TAC); art. 2.2.1.7.5.4 (contenido del manifiesto).
 - Normas vigentes registradas en la base de la firma (puedes apoyarte en ellas):
 ${normas}
 

@@ -654,22 +654,37 @@ function estadoBadge(e){
  const map={nueva:['Nueva','#2ecc71','rgba(46,204,113,.12)'],proyecto:['Proyecto','#d4871a','rgba(212,135,26,.12)'],actualizada:['Actualizada','#EABC1F','rgba(234,188,31,.14)'],reciente:['Recién detectada','#2ecc71','rgba(46,204,113,.16)'],vigente:['Vigente','#254B59','rgba(37,75,89,.1)']};
  const[l,c,b]=map[e];return `<span class="badge-pill" style="background:${b};color:${c}">${l}</span>`;
 }
-function startAnalisis(){
- if(analisisLoading||analisisDone)return;
- analisisLoading=true;renderNormativa();
- setTimeout(()=>{
-  analisisLoading=false;analisisDone=true;
-  nuevasIds=normasNuevas.map(n=>n.id);
-  listaNormas=[...normasNuevas,...listaNormas];
-  renderNormativa();
- },1700);
+let ANALISIS=null, BOLETIN=null;
+async function startAnalisis(){
+ if(analisisLoading)return;
+ analisisLoading=true;analisisDone=false;renderNormativa();
+ try{
+  ANALISIS=await api('/api/lc/normas/analizar',{method:'POST',timeout:290000});
+  analisisDone=true;
+  await cargarNormas();
+  nuevasIds=ANALISIS.creadas.map(n=>n.codigo);
+  aviso(ANALISIS.creadas.length?ANALISIS.creadas.length+' normas nuevas verificadas en fuentes oficiales.':'No se encontraron normas nuevas verificables.','ok');
+  cargarPanel();
+ }catch(e){
+  // Respaldo: en modo sin servidor se muestran las novedades de demostración
+  if(!normasDesdeBD){analisisDone=true;ANALISIS=null;nuevasIds=normasNuevas.map(n=>n.id);
+   listaNormas=[...normasNuevas.filter(n=>!listaNormas.some(x=>x.id===n.id)),...listaNormas];respaldo(e);}
+  else aviso('No se pudo completar el análisis: '+e.message,'error');
+ }finally{analisisLoading=false;renderNormativa();}
 }
-function startBoletin(){
+async function cargarBoletin(){try{const j=await api('/api/lc/boletin');if(j.boletin)BOLETIN=j.boletin;}catch(e){}}
+async function startBoletin(){
  if(boletinLoading)return;
  if(boletinOpen){boletinOpen=false;renderNormativa();return;}
  boletinLoading=true;renderNormativa();
- setTimeout(()=>{boletinLoading=false;boletinOpen=true;renderNormativa();
-  const el=document.getElementById('boletinBox');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},1500);
+ try{const j=await api('/api/lc/boletin',{method:'POST',timeout:200000});BOLETIN=j.boletin;aviso('Boletín N.º '+BOLETIN.numero+' generado y guardado.','ok');cargarPanel();}
+ catch(e){if(normasDesdeBD)aviso('No se pudo generar el boletín: '+e.message+(BOLETIN?' Se muestra el último guardado.':''),'error');else respaldo(e);}
+ finally{boletinLoading=false;boletinOpen=true;renderNormativa();
+  const el=document.getElementById('boletinBox');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+function exportarBoletin(fmt){
+ if(!BOLETIN){aviso('Genere el boletín con conexión al servidor para exportarlo.');return;}
+ const a=document.createElement('a');a.href='/api/lc/boletin/'+BOLETIN.id+'/export?format='+fmt;a.download='';document.body.appendChild(a);a.click();a.remove();
 }
 function loaderCard(txt,fuentesList){
  return `<div class="glass" style="padding:20px;margin-top:16px;border:1px solid rgba(234,188,31,.3)">
@@ -682,19 +697,19 @@ function loaderCard(txt,fuentesList){
   </div>`;
 }
 function renderNormativa(){
- const nuevasCount=analisisDone?normasNuevas.length:0;
+ const nuevasCount=analisisDone?(ANALISIS?ANALISIS.creadas.length:normasNuevas.length):0;
  document.getElementById('view-normativa').innerHTML=`
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
    <div><h1 class="page">Actualización Normativa</h1><p class="sub">Vigilancia continua de fuentes oficiales del sector transporte de carga</p></div>
    <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button class="glass-btn-ghost" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${(analisisLoading||analisisDone)?';opacity:.7':''}" ${(analisisLoading||analisisDone)?'disabled':''} onclick="startAnalisis()">
-      ${analisisLoading?`<span class="spin" style="width:16px;height:16px;display:inline-flex">${I.compass}</span>Analizando...`:analisisDone?`<span style="width:16px;height:16px;display:inline-flex;color:#2ecc71">${I.check}</span>Análisis realizado`:`${I.sparkles}Analizar nueva normativa`}</button>
+    <button class="glass-btn-ghost" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${analisisLoading?';opacity:.7':''}" ${analisisLoading?'disabled':''} onclick="startAnalisis()">
+      ${analisisLoading?`<span class="spin" style="width:16px;height:16px;display:inline-flex">${I.compass}</span>Analizando...`:analisisDone?`${I.sparkles}Analizar de nuevo`:`${I.sparkles}Analizar nueva normativa`}</button>
     <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px" onclick="startBoletin()">
       ${boletinLoading?`<span class="spin" style="width:16px;height:16px;display:inline-flex">${I.compass}</span>Generando...`:`${I.news}${boletinOpen?'Ocultar boletín':'Generar boletín semanal'}`}</button>
    </div>
   </div>
-  ${analisisLoading?loaderCard('Analizando nueva normativa…','Consultando Min. Transporte · Supertransporte · DIAN · Diario Oficial · INVIAS'):''}
-  ${analisisDone?`<div class="glass-gold" style="padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;display:inline-flex;color:#2ecc71">${I.check}</span><span style="font-size:13px;font-weight:500">Análisis completado · <strong>${nuevasCount} normas nuevas</strong> detectadas y añadidas a la lista.</span></div>`:''}
+  ${analisisLoading?loaderCard('Analizando nueva normativa…','Consultando Min. Transporte · Supertransporte · DIAN · INVIAS · Función Pública · verificando cada enlace oficial (1 a 2 minutos)'):''}
+  ${analisisDone?`<div class="glass-gold" style="padding:12px 16px;margin-top:16px;display:flex;align-items:flex-start;gap:10px"><span style="width:18px;height:18px;display:inline-flex;color:#2ecc71;flex-shrink:0">${I.check}</span><span style="font-size:13px;font-weight:500">Análisis completado · <strong>${nuevasCount} normas nuevas</strong> verificadas y añadidas a la lista${ANALISIS?` · ${ANALISIS.fuentes} resultados revisados en fuentes oficiales${ANALISIS.descartadas.length?` · ${ANALISIS.descartadas.length} descartadas (${esc(ANALISIS.descartadas.map(d=>d.codigo+': '+d.motivo).join('; '))})`:''}`:''}.</span></div>`:''}
   ${boletinLoading?loaderCard('Generando boletín semanal…','Consolidando novedades y redactando resúmenes'):''}
   ${boletinOpen?renderBoletin():''}
   ${(()=>{const ents=['todas',...Array.from(new Set(listaNormas.map(n=>n.entidad)))];const cats=['todas',...Array.from(new Set(listaNormas.map(n=>n.cat)))];
@@ -727,36 +742,40 @@ function renderNormativa(){
      <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">
       <a class="glass-pill" onclick="openNorma('${n.id.replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:6px">${I.ext}Ver resumen</a>
       <a class="glass-pill" onclick="window.open('${n.url}','_blank','noopener')" style="display:inline-flex;align-items:center;gap:6px">${I.ext}Texto oficial</a>
-      <a class="glass-pill" onclick="go('chat')" style="display:inline-flex;align-items:center;gap:6px">${I.msg}Preguntar</a></div>
+      <a class="glass-pill" onclick="preguntarNorma('${n.id.replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:6px">${I.msg}Preguntar</a></div>
     </div>`}).join('')}</div>`;})()}`;
 }
 function renderBoletin(){
- const byEnt={};listaNormas.forEach(n=>{(byEnt[n.entidad]=byEnt[n.entidad]||[]).push(n)});
+ let secciones,intro='',periodo=mesActual().toUpperCase(),numero=29;
+ if(BOLETIN){secciones=BOLETIN.contenido.secciones;intro=BOLETIN.contenido.intro;periodo=BOLETIN.periodo;numero=BOLETIN.numero;}
+ else{const byEnt={};listaNormas.forEach(n=>{(byEnt[n.entidad]=byEnt[n.entidad]||[]).push(n)});
+  secciones=Object.keys(byEnt).map(ent=>({entidad:ent,items:byEnt[ent].map(n=>({codigo:n.id,titulo:n.titulo,tema:n.tema,resumen:n.resumen,url:n.url}))}));}
  const serif="Georgia,'Times New Roman',serif";
  let counter=0;
  return `<div id="boletinBox" style="margin-top:20px">
-   <div style="display:flex;justify-content:flex-end;max-width:840px;margin:0 auto 10px"><button class="glass-btn-ghost" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="alert('Demo: exportar boletín a PDF / Word')">${I.download}Exportar boletín</button></div>
+   <div style="display:flex;justify-content:flex-end;gap:10px;max-width:840px;margin:0 auto 10px">
+    <button class="glass-btn-ghost" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="exportarBoletin('docx')">${I.download}Exportar a Word</button>
+    <button class="glass-btn-primary" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px" onclick="exportarBoletin('pdf')">${I.download}Exportar a PDF</button></div>
    <div style="max-width:840px;margin:0 auto;background:#fff;border:1px solid rgba(37,75,89,.15);border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(37,75,89,.12);font-family:${serif}">
-    <!-- Encabezado -->
     <div style="background:linear-gradient(120deg,#16303a 0%,#254B59 100%);padding:22px 28px 18px;text-align:center">
      <img src="${LOGO_EMBLEM}" alt="Franco & Abogados Asociados" style="height:60px;width:auto;margin:0 auto 2px;display:block">
      <p style="font-family:${serif};font-size:12px;font-weight:600;letter-spacing:.14em;color:#fff;margin:0 0 10px">FRANCO <span style="color:#EABC1F">&amp;</span> ABOGADOS ASOCIADOS</p>
      <h2 style="font-family:${serif};font-size:32px;font-weight:700;letter-spacing:.02em;color:#fff;margin:0;line-height:1.1">BOLETÍN <span style="color:#EABC1F">NORMATIVO</span></h2>
      <div style="height:2px;width:66%;margin:9px auto 8px;background:linear-gradient(90deg,transparent,#EABC1F 50%,transparent)"></div>
      <p style="font-family:${serif};font-size:15px;font-weight:600;letter-spacing:.22em;color:#EABC1F;margin:0">SECTOR TRANSPORTE</p>
-     <p style="font-size:10px;letter-spacing:.16em;color:rgba(255,255,255,.75);margin:7px 0 0">SEPTIEMBRE 2026 &nbsp;•&nbsp; N.&nbsp;29</p>
+     <p style="font-size:10px;letter-spacing:.16em;color:rgba(255,255,255,.75);margin:7px 0 0">${esc(periodo)} &nbsp;•&nbsp; N.&nbsp;${numero}</p>
     </div>
-    <!-- Cuerpo -->
     <div style="padding:6px 34px 22px">
-     ${Object.keys(byEnt).map(ent=>`
-      <h3 style="font-family:${serif};text-align:center;color:#b08a2b;font-size:19px;font-weight:700;letter-spacing:.02em;margin:24px 0 14px">${ent.toUpperCase()}</h3>
-      ${byEnt[ent].map(n=>{counter++;return `
+     ${intro?`<p style="font-family:${serif};text-align:justify;color:#2b3a42;font-size:13.5px;line-height:1.7;margin:20px 0 4px">${esc(intro)}</p>`:''}
+     ${secciones.map(s=>`
+      <h3 style="font-family:${serif};text-align:center;color:#b08a2b;font-size:19px;font-weight:700;letter-spacing:.02em;margin:24px 0 14px">${esc(s.entidad.toUpperCase())}</h3>
+      ${s.items.map(n=>{counter++;return `
        <div style="margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:11px;margin-bottom:7px">
          <span style="flex-shrink:0;width:27px;height:27px;border:2px solid #254B59;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:${serif};font-size:13px;font-weight:700;color:#254B59">${counter}</span>
-         <a onclick="window.open('${n.url}','_blank','noopener')" style="font-family:${serif};font-size:15px;font-weight:700;color:#1D3A45;text-decoration:underline;text-decoration-color:#2f6fb0;text-underline-offset:2px;cursor:pointer">${esc(n.titulo.toUpperCase())}</a>
+         <a href="${esc(n.url)}" target="_blank" rel="noopener" style="font-family:${serif};font-size:15px;font-weight:700;color:#1D3A45;text-decoration:underline;text-decoration-color:#2f6fb0;text-underline-offset:2px;cursor:pointer">${esc(n.titulo.toUpperCase())}</a>
         </div>
-        <p style="font-family:${serif};font-style:italic;font-weight:700;color:#254B59;font-size:13px;margin:0 0 7px 38px">TEMA: ${esc(n.tema)}.</p>
+        <p style="font-family:${serif};font-style:italic;font-weight:700;color:#254B59;font-size:13px;margin:0 0 7px 38px">TEMA: ${esc(n.tema)}. <span style="font-weight:400;font-style:normal;color:#6b7b85">${esc(n.codigo)}</span></p>
         <p style="font-family:${serif};text-align:justify;color:#2b3a42;font-size:13px;line-height:1.65;margin:0 0 0 38px">${esc(n.resumen)}</p>
        </div>`;}).join('')}
      `).join('')}
@@ -765,7 +784,6 @@ function renderBoletin(){
       <p style="font-family:${serif};font-size:11.5px;font-style:italic;color:#6b5a34;margin:3px 0 0;line-height:1.5">Usted podrá consultar el texto de la norma completa pulsando clic sobre el título de cada una (señalado con azul).</p>
      </div>
     </div>
-    <!-- Pie -->
     <div style="background:#1D3A45;padding:14px 20px;text-align:center;color:rgba(255,255,255,.85)">
      <p style="font-family:${serif};font-size:11.5px;font-weight:700;letter-spacing:.03em;margin:0">FRANCO &amp; ABOGADOS ASOCIADOS S.A.S.</p>
      <p style="font-family:${serif};font-size:10px;margin:3px 0 0;color:rgba(255,255,255,.7)">Teléfono: (+57) (1) 7035633 · contactenos@francoabogados.com.co</p>
@@ -796,7 +814,7 @@ function openNorma(id){
     ${n.impacto?`<div class="glass-gold" style="padding:14px;margin-top:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="color:#EABC1F;width:16px;height:16px;display:inline-flex">${I.compass}</span><span style="font-size:13px;font-weight:600;color:#C9A018">Impacto para su operación</span></div><p style="font-size:14px;line-height:1.6">${esc(n.impacto)}</p></div>`:''}
     <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
      <button class="glass-btn-ghost" style="padding:9px 14px;display:inline-flex;align-items:center;gap:6px" onclick="window.open('${n.url}','_blank','noopener')">${I.ext}Ver texto oficial</button>
-     <button class="glass-btn-primary" style="padding:9px 14px;display:inline-flex;align-items:center;gap:6px" onclick="closeModal();go('chat')">${I.msg}Preguntar al asistente</button>
+     <button class="glass-btn-primary" style="padding:9px 14px;display:inline-flex;align-items:center;gap:6px" onclick="preguntarNorma('${n.id.replace(/'/g,"\\'")}')">${I.msg}Preguntar al asistente</button>
     </div>
    </div>
   </div>`;
@@ -1095,12 +1113,13 @@ function renderManifiesto(){
 
 /* ===== Chat ===== */
 function mdToHtml(md){
+ md=esc(md).replace(/&quot;/g,'"');
  const lines=md.split('\n');let html='',inUl=false,inOl=false,tbl=[];
  const flush=()=>{if(inUl){html+='</ul>';inUl=false}if(inOl){html+='</ol>';inOl=false}
   if(tbl.length){const rows=tbl.filter(r=>!/^\s*\|[-\s|]+\|\s*$/.test(r));
    html+='<table>'+rows.map((r,i)=>{const cells=r.split('|').slice(1,-1).map(c=>c.trim());
     return '<tr>'+cells.map(c=>i===0?`<th>${c}</th>`:`<td>${c}</td>`).join('')+'</tr>'}).join('')+'</table>';tbl=[]}};
- const inl=t=>t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+ const inl=t=>t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,a,u)=>`<a href="${u.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="color:#1f4e8c;text-decoration:underline;text-underline-offset:2px">${a}</a>`).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*\s][^*]*?)\*/g,'$1<em>$2</em>');
  lines.forEach(l=>{
   if(/^\s*\|.*\|\s*$/.test(l)){if(inUl||inOl)flush();tbl.push(l);return}else if(tbl.length)flush();
   if(/^&gt;\s|^>\s/.test(l)){flush();html+=`<p style="border-left:3px solid #EABC1F;padding-left:10px;color:#254B59">${inl(l.replace(/^(&gt;|>)\s/,''))}</p>`}
@@ -1113,7 +1132,16 @@ function mdToHtml(md){
 }
 const quickActions=["¿La empresa de transporte tiene derecho de retención de la mercancía si no le pagan el flete?","¿Qué diferencia jurídica hay entre la remesa y el manifiesto de carga?","Si el manifiesto registra ICA en $0, ¿qué contingencia me genera?","¿Puedo trasladar por contrato el costo del descargue a la empresa de transporte?","Con el Decreto 1017 de 2025, ¿qué cambió en los tiempos de cargue y descargue?","¿Qué sanciones arriesga la empresa de transporte por operar con un manifiesto mal diligenciado?"];
 let chatMsgs=[{role:'assistant',content:`**Asistente Legal · Sector Transporte**\n\nTengo acceso al perfil de su empresa: novedades normativas, contratos analizados y manifiestos revisados.\n\n¿En qué puedo ayudarle hoy?`}];
-let chatLoading=false;
+let chatLoading=false, chatNorma=null, chatHistCargado=false;
+async function cargarChat(){
+ try{const j=await api('/api/lc/chat');chatHistCargado=true;
+  if(j.mensajes.length){chatMsgs=[chatMsgs[0],...j.mensajes.map(m=>({role:m.role,content:m.content,at:m.created_at,norma:m.norma_codigo}))];renderChat();}}
+ catch(e){respaldo(e);}
+}
+function preguntarNorma(codigo){
+ closeModal();chatNorma=codigo;go('chat');
+ sendChat('¿Qué implica '+codigo+' para mi operación como generador de carga y qué debo revisar en mis contratos y manifiestos?');
+}
 function renderChat(){
  const now=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
  document.getElementById('view-chat').innerHTML=`
@@ -1128,12 +1156,13 @@ function renderChat(){
     ${chatMsgs.map(m=>`<div style="display:flex;gap:12px;justify-content:${m.role==='user'?'flex-end':'flex-start'}">
       ${m.role==='assistant'?`<div style="display:flex;height:32px;width:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:12px;background:rgba(234,188,31,.12);border:1px solid rgba(234,188,31,.2);color:#EABC1F;margin-top:4px">${I.bot}</div>`:''}
       <div class="${m.role==='assistant'?'glass-bubble-ai':'glass-bubble-user'}" style="max-width:78%;padding:12px 16px;font-size:14px">
-       ${m.role==='assistant'?`<div class="prose">${mdToHtml(m.content)}</div>`:`<p>${m.content}</p>`}
-       <p style="margin-top:8px;font-size:10px;color:rgba(122,122,122,.6)">${now}</p></div>
+       ${m.role==='assistant'?`<div class="prose">${m.content?mdToHtml(m.content):'<span style="color:var(--muted)">Consultando la base normativa…</span>'}</div>`:`<p>${esc(m.content)}</p>`}
+       <p style="margin-top:8px;font-size:10px;color:rgba(122,122,122,.6)">${m.at?new Date(m.at).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}):now}${m.norma?' · '+esc(m.norma):''}${m.respaldo?' · respuesta de respaldo':''}</p></div>
       ${m.role==='user'?`<div class="glass-sm" style="display:flex;height:32px;width:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:12px;color:var(--navy-medium);margin-top:4px">${I.user}</div>`:''}
      </div>`).join('')}
-    ${chatLoading?`<div style="display:flex;gap:12px"><div style="display:flex;height:32px;width:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:12px;background:rgba(234,188,31,.12);border:1px solid rgba(234,188,31,.2);color:#EABC1F;margin-top:4px">${I.bot}</div><div class="glass-bubble-ai" style="padding:12px 16px"><div style="display:flex;gap:6px">${[0,150,300].map(d=>`<span style="height:8px;width:8px;border-radius:999px;background:rgba(234,188,31,.6);animation:bounce .6s infinite;animation-delay:${d}ms"></span>`).join('')}</div></div></div>`:''}
+    ${chatLoading&&!(chatMsgs[chatMsgs.length-1]||{}).stream?`<div style="display:flex;gap:12px"><div style="display:flex;height:32px;width:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:12px;background:rgba(234,188,31,.12);border:1px solid rgba(234,188,31,.2);color:#EABC1F;margin-top:4px">${I.bot}</div><div class="glass-bubble-ai" style="padding:12px 16px"><div style="display:flex;gap:6px">${[0,150,300].map(d=>`<span style="height:8px;width:8px;border-radius:999px;background:rgba(234,188,31,.6);animation:bounce .6s infinite;animation-delay:${d}ms"></span>`).join('')}</div></div></div>`:''}
    </div>
+   ${chatNorma?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-shrink:0;font-size:12px;color:var(--muted)"><span class="badge-pill" style="background:rgba(234,188,31,.14);color:#C9A018">Contexto: ${esc(chatNorma)}</span><button class="glass-pill" onclick="chatNorma=null;renderChat()">Quitar contexto</button></div>`:''}
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0">
     ${quickActions.map(a=>`<button class="glass-pill" onclick="sendChat(${JSON.stringify(a).replace(/"/g,'&quot;')})">${a}</button>`).join('')}
    </div>
@@ -1144,13 +1173,30 @@ function renderChat(){
   </div>`;
  const c=document.getElementById('chatMsgs');if(c)c.scrollTop=c.scrollHeight;
 }
-function sendChat(text){
+let chatRenderTimer=null;
+function renderChatPronto(){if(chatRenderTimer)return;chatRenderTimer=setTimeout(()=>{chatRenderTimer=null;renderChat();},70);}
+async function sendChat(text){
  if(!text||!text.trim()||chatLoading)return;
- chatMsgs.push({role:'user',content:text.trim()});chatLoading=true;renderChat();
- setTimeout(()=>{
-  const reply=chatResponses[text.trim()]||`Gracias por su consulta. En esta **demo** están precargadas las respuestas de los botones de acción rápida.\n\nEn la versión real, esta pregunta se procesa con un **RAG jurídico** (normativa vigente indexada) y un modelo de lenguaje, devolviendo la respuesta con las **fuentes** que la sustentan.`;
-  chatMsgs.push({role:'assistant',content:reply});chatLoading=false;renderChat();
- },800);
+ const q=text.trim();
+ chatMsgs.push({role:'user',content:q,at:new Date().toISOString(),norma:chatNorma});chatLoading=true;renderChat();
+ const ctl=new AbortController();let primer=false;
+ const to=setTimeout(()=>{if(!primer)ctl.abort();},25000);
+ const msg={role:'assistant',content:'',at:new Date().toISOString(),norma:chatNorma,stream:true};
+ try{
+  const r=await fetch('/api/lc/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mensaje:q,norma:chatNorma}),signal:ctl.signal,credentials:'same-origin'});
+  if(r.status===401&&location.protocol.startsWith('http')){location.href='/';return;}
+  if(!r.ok||!r.body){let e='Error '+r.status;try{e=(await r.json()).error||e}catch(_){}throw new Error(e);}
+  chatMsgs.push(msg);
+  const rd=r.body.getReader(),dec=new TextDecoder();
+  while(true){const {done,value}=await rd.read();if(done)break;primer=true;msg.content+=dec.decode(value,{stream:true});renderChatPronto();}
+  if(msg.content.includes('⟦error⟧')){msg.content=msg.content.replace('⟦error⟧','').trim()||'No fue posible completar la respuesta. Intente de nuevo.';}
+ }catch(e){
+  console.warn('[chat respaldo]',e&&e.message);
+  const i=chatMsgs.indexOf(msg);if(i>=0)chatMsgs.splice(i,1);
+  const pre=chatResponses[q];
+  chatMsgs.push({role:'assistant',content:pre||'No fue posible conectar con el asistente en este momento. Intente de nuevo en unos segundos.',at:new Date().toISOString(),respaldo:!!pre});
+  aviso(pre?'El asistente no respondió a tiempo: se muestra una respuesta de respaldo.':'No fue posible conectar con el asistente.',pre?undefined:'error');
+ }finally{clearTimeout(to);msg.stream=false;chatLoading=false;renderChat();}
 }
 
 const st=document.createElement('style');st.textContent='@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}';document.head.appendChild(st);
@@ -1159,7 +1205,7 @@ const st=document.createElement('style');st.textContent='@keyframes bounce{0%,10
 initStatic();
 renderDashboard();renderNormativa();renderContratos();renderManifiesto();renderChat();updateSideScore();
 go('dashboard');
-cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();
+cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();cargarChat();cargarBoletin();
 
 /* logout real: borra la cookie de sesión en el servidor */
 function logout(){fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}
