@@ -157,12 +157,12 @@
 <div class="app">
   <aside id="sidebar">
     <div class="side-logo"><div class="badge" id="logoBadge"></div><span class="name hide-collapsed">Logicompliance</span></div>
-    <div class="company hide-collapsed">
+    <div class="company hide-collapsed" style="cursor:pointer" onclick="abrirBienvenida(true)" title="Datos de la empresa">
       <div class="box">
-        <p class="cname">Transportes Andinos de Carga S.A.S.</p>
-        <p class="cnit">NIT: 901.455.789-2</p>
+        <p class="cname" id="empNombre">Su empresa</p>
+        <p class="cnit" id="empNit">Configure su empresa</p>
         <div class="score-row"><span class="dot"><span class="ping" id="sideDotPing"></span><span class="core" id="sideDotCore"></span></span><span class="score-lbl" id="sideScore">Cumplimiento: 2.9/5</span></div>
-        <div><span class="plan">Enterprise · Sector Transporte</span></div>
+        <div><span class="plan" id="empPlan">Generador de carga</span></div>
       </div>
     </div>
     <nav id="nav"></nav>
@@ -257,7 +257,7 @@ function aviso(msg,tipo){
  el.innerHTML=esc(msg);el.style.opacity='1';clearTimeout(el._t);el._t=setTimeout(()=>{el.style.opacity='0'},6000);
 }
 let respaldoAvisado=false;
-function respaldo(e){console.warn('[respaldo]',e&&e.message);if(!respaldoAvisado){respaldoAvisado=true;aviso('Sin conexión con el servidor: se muestran datos de respaldo.');}}
+function respaldo(e){console.warn('[sin servidor]',e&&e.message);errorServidor=true;if(!respaldoAvisado){respaldoAvisado=true;aviso('No fue posible conectar con el servidor. Recargue la página en unos segundos.','error');}try{renderDashboard();renderNormativa();}catch(_){}}
 function hace(iso){
  const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
  if(s<60)return 'Hace un momento';if(s<3600)return 'Hace '+Math.floor(s/60)+' min';if(s<86400)return 'Hace '+Math.floor(s/3600)+' h';
@@ -267,87 +267,22 @@ const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','
 const mesActual=()=>{const d=new Date();return MESES[d.getMonth()]+' '+d.getFullYear();};
 let PANEL=null; // respuesta de /api/lc/panel
 
-/* ===== DATOS DEMO (hardcodeados) ===== */
+/* ===== Configuración de la interfaz (sin datos de negocio: todo viene de la BD) ===== */
 const kpis=[
- {n:6,l:'Normas nuevas · semana',col:'#EABC1F',bg:'rgba(234,188,31,.08)',bd:'rgba(234,188,31,.18)',ic:'news'},
- {n:8,l:'Contratos analizados',col:'#254B59',bg:'rgba(37,75,89,.06)',bd:'rgba(37,75,89,.15)',ic:'scale'},
- {n:24,l:'Manifiestos revisados',col:'#2ecc71',bg:'rgba(46,204,113,.08)',bd:'rgba(46,204,113,.18)',ic:'truck'},
- {n:11,l:'Hallazgos activos',col:'#e05252',bg:'rgba(224,82,82,.08)',bd:'rgba(224,82,82,.18)',ic:'alertCircle'},
+ {l:'Normas nuevas · semana',col:'#EABC1F',bg:'rgba(234,188,31,.08)',bd:'rgba(234,188,31,.18)',ic:'news'},
+ {l:'Contratos analizados',col:'#254B59',bg:'rgba(37,75,89,.06)',bd:'rgba(37,75,89,.15)',ic:'scale'},
+ {l:'Manifiestos revisados',col:'#2ecc71',bg:'rgba(46,204,113,.08)',bd:'rgba(46,204,113,.18)',ic:'truck'},
+ {l:'Hallazgos activos',col:'#e05252',bg:'rgba(224,82,82,.08)',bd:'rgba(224,82,82,.18)',ic:'alertCircle'},
 ];
 const modules=[
- {id:'normativa',ic:'news',t:'Actualización Normativa',d:'Vigilancia de fuentes oficiales y boletín semanal del sector transporte.',tag:'6 novedades',col:'#EABC1F'},
- {id:'contratos',ic:'scale',t:'Revisión de Contratos',d:'Análisis de cláusulas, riesgos, faltantes y redacción mejorada.',tag:'Riesgo 2.6/5',col:'#254B59'},
- {id:'manifiesto',ic:'truck',t:'Análisis de Manifiesto',d:'Verificación del manifiesto de carga contra el Decreto 1079 de 2015.',tag:'4 errores',col:'#e05252'},
-];
-const activity=[
- {ic:'truck',col:'#e05252',t:'Manifiesto 01278713 — 4 errores detectados',s:'Retención ICA en $0 · falta tiempos de cargue/descargue',time:'Hace 12 min'},
- {ic:'news',col:'#EABC1F',t:'Decreto 1017 de 2025 — Ministerio de Transporte',s:'Nuevas reglas de cargue y descargue (límite de 8 horas y penalidades)',time:'Hace 2 h'},
- {ic:'scale',col:'#254B59',t:'Contrato Grupo NF / Ingenio Providencia analizado',s:'5 hallazgos · riesgo 2.6/5 · 5 cláusulas con redacción mejorada',time:'Ayer'},
- {ic:'news',col:'#EABC1F',t:'Resolución 20263040016075 de 2026 — RNDC',s:'Unificación de la reglamentación del manifiesto electrónico de carga',time:'Hace 2 días'},
+ {id:'normativa',ic:'news',t:'Actualización Normativa',d:'Vigilancia de fuentes oficiales y boletín semanal del sector transporte.',col:'#EABC1F'},
+ {id:'contratos',ic:'scale',t:'Revisión de Contratos',d:'Análisis de cláusulas, riesgos, faltantes y redacción mejorada.',col:'#254B59'},
+ {id:'manifiesto',ic:'truck',t:'Análisis de Manifiesto',d:'Verificación del manifiesto de carga contra el Decreto 1079 de 2015.',col:'#e05252'},
 ];
 
-/* Módulo 1 — Normativa (normas REALES con enlace oficial) */
-const normas=[
- {id:'Decreto 1079 de 2015',entidad:'Presidencia de la República',tipo:'Decreto',estado:'vigente',fecha:'26/05/2015',vigencia:'Vigente (marco base)',cat:'Marco general',tema:'Decreto Único Reglamentario del Sector Transporte',
-  titulo:'Decreto Único Reglamentario del Sector Transporte',
-  resumen:'Compila la reglamentación del sector transporte. Contiene los datos mínimos del manifiesto de carga (art. 2.2.1.7.5.4) y la regla de pago del cargue y descargue (art. 2.2.1.7.6.9).',
-  puntos:['Define el contenido mínimo del manifiesto electrónico de carga (art. 2.2.1.7.5.4).','Establece que el cargue y descargue lo asume el remitente y/o destinatario (art. 2.2.1.7.6.9).','Es el marco reglamentario contra el cual se verifican manifiestos y contratos.'],
-  impacto:'Es la norma de referencia para el análisis de sus manifiestos y contratos de transporte.',
-  url:'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=77889'},
- {id:'Ley 336 de 1996',entidad:'Congreso de la República',tipo:'Ley',estado:'vigente',fecha:'20/12/1996',vigencia:'Vigente (marco legal)',cat:'Marco general',tema:'Estatuto Nacional de Transporte',
-  titulo:'Estatuto Nacional de Transporte',
-  resumen:'Adopta el Estatuto Nacional de Transporte y fija los principios y criterios del servicio público de transporte, con la seguridad como prioridad esencial.',
-  puntos:['Principios del servicio público de transporte.','La seguridad, y en especial la protección del usuario, como prioridad esencial.','Régimen sancionatorio del sector transporte.'],
-  impacto:'Marco legal superior del sector; sustenta las obligaciones y sanciones aplicables.',
-  url:'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=346'},
- {id:'Resolución 40595 de 2022',entidad:'Ministerio de Transporte',tipo:'Resolución',estado:'vigente',fecha:'12/07/2022',vigencia:'Vigente',cat:'Seguridad vial',tema:'Plan Estratégico de Seguridad Vial (PESV)',
-  titulo:'Metodología de diseño e implementación del Plan Estratégico de Seguridad Vial (PESV)',
-  resumen:'Define y adopta la metodología para el diseño, implementación y verificación del PESV, bajo el ciclo PHVA, y deroga la Resolución 1565 de 2014.',
-  puntos:['Aplica a organizaciones con flota superior a 10 vehículos o que administren conductores.','Tres niveles de diseño: básico, estándar y avanzado.','Se articula con el Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST).'],
-  impacto:'Revise y actualice su PESV y su evidencia documental antes de una verificación.',
-  url:'https://normograma.mincultura.gov.co/mincultura/compilacion/docs/resolucion_mintransporte_40595_2022.htm'},
- {id:'Resolución DIAN 000165 de 2023',entidad:'DIAN',tipo:'Resolución',estado:'vigente',fecha:'01/11/2023',vigencia:'Vigente',cat:'Tributario y facturación',tema:'Facturación electrónica y documento equivalente',
-  titulo:'Sistema de facturación electrónica y documento equivalente electrónico',
-  resumen:'Regula la generación, transmisión, validación, expedición y recepción de la factura electrónica y del documento equivalente electrónico; deroga la Resolución 000042 de 2020.',
-  puntos:['Adopta el documento equivalente electrónico.','Actualiza el anexo técnico de la factura electrónica.','Obligatoriedad de facturar electrónicamente para los responsables.'],
-  impacto:'Alinee su facturación electrónica con los datos del manifiesto y la remesa para evitar rechazos y glosas.',
-  url:'https://normograma.dian.gov.co/dian/compilacion/docs/resolucion_dian_0165_2023.htm'},
- {id:'Actualización del SICE-TAC (Mintransporte, 2025)',entidad:'Ministerio de Transporte',tipo:'Resolución',estado:'actualizada',fecha:'26/05/2025',vigencia:'Vigente',cat:'Fletes y SICE-TAC',tema:'Actualización del SICE-TAC',
-  titulo:'Actualización del SICE-TAC: carga liviana y pago mínimo garantizado',
-  resumen:'Actualiza el Sistema de Información de Costos Eficientes para el Transporte Automotor de Carga (SICE-TAC), con costos más acordes con la realidad, inclusión de la carga liviana y garantía de pago mínimo a la empresa de transporte.',
-  puntos:['Incorpora la carga liviana (3.500 a 7.500 kg) al SICE-TAC.','Actualiza las variables de costo de operación.','El valor calculado por el SICE-TAC es el pago mínimo de obligatorio cumplimiento.'],
-  impacto:'Verifique que el flete pactado no sea inferior al valor calculado por el SICE-TAC.',
-  url:'https://mintransporte.gov.co/publicaciones/12356/mintransporte-actualiza-el-sice-tac-costos-mas-acordes-con-la-realidad-inclusion-de-transporte-de-carga-liviana-y-garantia-de-pago-minimo-para-transportadores/'},
- {id:'Instrucciones SICETAC (Supertransporte, 2024)',entidad:'Superintendencia de Transporte',tipo:'Circular',estado:'nueva',fecha:'2024',vigencia:'Vigente',cat:'Fletes y SICE-TAC',tema:'Supervisión del cumplimiento del SICETAC',
-  titulo:'Instrucciones a generadores y empresas de carga sobre el cumplimiento del SICETAC',
-  resumen:'La Superintendencia de Transporte imparte instrucciones a generadores y empresas de carga sobre el cumplimiento del SICETAC y los criterios de supervisión aplicables.',
-  puntos:['Instrucciones sobre el reporte y cumplimiento del SICE-TAC.','Criterios de focalización de la vigilancia.','Advertencias sobre el pago por debajo del piso tarifario.'],
-  impacto:'Prepare la trazabilidad de sus reportes y del pago mínimo para una eventual visita de la Superintendencia.',
-  url:'https://www.supertransporte.gov.co/index.php/comunicaciones-2024/supertransporte-imparte-instrucciones-a-generadores-y-empresas-de-carga-sobre-el-cumplimiento-del-sicetac/'},
-];
-const normasNuevas=[
- {id:'Decreto 1017 de 2025',entidad:'Ministerio de Transporte',tipo:'Decreto',estado:'nueva',fecha:'21/09/2025',vigencia:'Vigente',cat:'Fletes y SICE-TAC',tema:'Modernización de las reglas del transporte de carga',
-  titulo:'Modernización de las reglas del transporte de carga (fletes, cargue y descargue)',
-  resumen:'Modifica el Capítulo 7 del Decreto 1079 de 2015. Reafirma que el flete no puede ser inferior al SICE-TAC y fija reglas y penalidades para los tiempos de cargue y descargue.',
-  puntos:['El valor a pagar no puede ser inferior a los costos eficientes del SICE-TAC.','Fija un límite de 8 horas para el cargue y descargue contadas desde la cita.','Penalidad de 3 SMLDV por hora adicional en vehículos articulados y 2 SMLDV en rígidos.','Modifica el artículo 2.2.1.7.3 del Decreto 1079 de 2015.'],
-  impacto:'Ajuste sus contratos y su control de tiempos de cargue y descargue a los nuevos límites y penalidades.',
-  url:'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=264276'},
- {id:'Resolución 20263040016075 de 2026',entidad:'Ministerio de Transporte',tipo:'Resolución',estado:'nueva',fecha:'29/04/2026',vigencia:'Vigente',cat:'Manifiesto y RNDC',tema:'RNDC y manifiesto electrónico de carga',
-  titulo:'Unificación y compilación de la reglamentación del RNDC',
-  resumen:'Unifica y compila la reglamentación del Registro Nacional de Despachos de Carga (RNDC) y del manifiesto electrónico de carga.',
-  puntos:['El manifiesto electrónico se genera con mérito ejecutivo.','No se expide el manifiesto por valores inferiores a los costos del SICE-TAC.','Registro de tiempos logísticos mediante uso de tecnología.'],
-  impacto:'Valide el diligenciamiento completo del manifiesto en el RNDC, en especial los tiempos de cargue y descargue.',
-  url:'https://plc.mintransporte.gov.co/Portals/0/Manuales/MANUAL%20RNDC%202026.pdf'},
- {id:'Actualización de peajes 2026 (INVIAS)',entidad:'INVIAS',tipo:'Resolución',estado:'actualizada',fecha:'15/01/2026',vigencia:'Vigente desde enero de 2026',cat:'Infraestructura y peajes',tema:'Reajuste de tarifas de peaje 2026',
-  titulo:'Actualización de las tarifas de peaje para 2026',
-  resumen:'INVIAS ajusta las tarifas de peaje de sus estaciones para 2026 con un incremento del 5,10% correspondiente a la variación del IPC de 2025.',
-  puntos:['Ajuste del 5,10% (IPC 2025).','Aplica a 38 estaciones de peaje en 16 departamentos.','Vigencia a partir de enero de 2026.'],
-  impacto:'Actualice la estructura de costos de sus rutas y la negociación de fletes con el reajuste de peajes.',
-  url:'https://www.invias.gov.co/publicaciones/9378/invias-actualiza-tarifas-de-las-estaciones-de-peaje-para-el-ano-2026/'},
-];
-const fuentes=['Ministerio de Transporte','Superintendencia de Transporte','DIAN','INVIAS','Diario Oficial','Función Pública','Portal Logístico (PLC)','RNDC'];
-let listaNormas=[...normas];
-let normasDesdeBD=false;
+/* Módulo 1 — Normativa */
+let listaNormas=[];
+let normasDesdeBD=false, errorServidor=false;
 function normaDeBD(r){return {id:r.codigo,entidad:r.entidad,tipo:r.tipo,estado:r.estado,fecha:r.fecha||'',vigencia:r.vigencia,cat:r.cat,tema:r.tema||'',titulo:r.titulo,resumen:r.resumen,puntos:r.puntos||[],impacto:r.impacto,url:r.url,origen:r.origen,fuente:r.fuente,creada:r.created_at};}
 async function cargarNormas(){
  try{const j=await api('/api/lc/normas');listaNormas=j.normas.map(normaDeBD);normasDesdeBD=true;
@@ -356,181 +291,7 @@ async function cargarNormas(){
 }
 
 /* Módulo 2 — Contratos */
-const contrato={
- nombre:'Contrato de transporte terrestre de carga',
- partes:'Grupo NF S.A.S. (empresa de transporte) · Ingenio Providencia S.A. (generador)',
- fecha:'13/05/2025', clausulas:14, score:2.6,
-};
-const contratoTexto=`CONTRATO DE TRANSPORTE TERRESTRE DE CARGA
-
-Entre los suscritos, GRUPO NF S.A.S., identificada con NIT 901.780.925 (en adelante, la "EMPRESA DE TRANSPORTE"), e INGENIO PROVIDENCIA S.A., identificada con NIT 891.300.238-6 (en adelante, el "GENERADOR"), se celebra el presente contrato de transporte terrestre de carga, que se regirá por las siguientes cláusulas:
-
-PRIMERA. OBJETO. La EMPRESA DE TRANSPORTE se obliga a transportar por vía terrestre la mercancía entregada por el GENERADOR desde el origen hasta el destino acordados en cada remesa, y a entregarla al destinatario en las condiciones en que la recibió.
-
-SEGUNDA. MERCANCÍA. La mercancía objeto de transporte corresponde a azúcar refinada para uso industrial, movilizada en contenedor, cuyas cantidades y características se detallan en la respectiva remesa terrestre de carga.
-
-TERCERA. VALOR Y FORMA DE PAGO. El GENERADOR pagará a la EMPRESA DE TRANSPORTE el valor del flete acordado por viaje, previa presentación de la factura y del cumplido de la entrega. El pago se realizará dentro de los términos pactados en la remesa.
-
-CUARTA. RESPONSABILIDAD. La empresa de transporte responderá por la mercancía transportada conforme a la ley.
-
-QUINTA. CARGUE Y DESCARGUE. Las labores de cargue y descargue serán coordinadas por las partes según la operación.
-
-SEXTA. OBLIGACIONES DE LA EMPRESA DE TRANSPORTE. La EMPRESA DE TRANSPORTE se obliga a: (i) contar con la habilitación y los vehículos idóneos; (ii) expedir el manifiesto electrónico de carga y registrarlo en el RNDC; (iii) cumplir las normas de tránsito y transporte aplicables.
-
-SÉPTIMA. DURACIÓN. El presente contrato tendrá una duración de un (1) año contado a partir de su suscripción, prorrogable por acuerdo entre las partes.
-
-OCTAVA. VIGENCIA. El presente contrato deja sin efecto cualquier acuerdo anterior entre las partes sobre la misma materia.`;
-// Versión del contrato con TODAS las redacciones propuestas incorporadas (para "Ver contrato mejorado")
-const contratoClausulasMejorado=[
- {t:'PRIMERA. OBJETO', body:'La EMPRESA DE TRANSPORTE se obliga a transportar por vía terrestre la mercancía entregada por el GENERADOR desde el origen hasta el destino acordados en cada remesa, y a entregarla al destinatario en las condiciones en que la recibió.', status:'same'},
- {t:'SEGUNDA. MERCANCÍA', body:'La mercancía objeto de transporte corresponde a azúcar refinada para uso industrial, movilizada en contenedor, cuyas cantidades y características se detallan en la respectiva remesa terrestre de carga.', status:'same'},
- {t:'TERCERA. VALOR Y FORMA DE PAGO', body:'El GENERADOR pagará a la EMPRESA DE TRANSPORTE el valor del flete acordado por viaje, el cual en ningún caso será inferior a los costos eficientes de operación calculados por el SICE-TAC. El pago se realizará previa presentación de la factura y del cumplido de la entrega, dentro de los términos pactados en la remesa.', status:'mod'},
- {t:'CUARTA. RESPONSABILIDAD POR RETRASO', body:'La empresa de transporte responderá por el retraso en la entrega de la mercancía respecto del plazo pactado. Las partes fijan como indemnización por cada día de retraso una suma equivalente a [__] del valor del flete, sin perjuicio de los demás perjuicios que se demuestren. Se exceptúan los eventos de causa extraña debidamente probados.', status:'mod'},
- {t:'QUINTA. SEGUROS', body:'La empresa de transporte se obliga a mantener vigente un seguro de transporte de mercancías, así como cualquier otro seguro necesario para cubrir la operación de transporte ante el incumplimiento de sus obligaciones, y a acreditarlo ante el generador antes del cargue. La ausencia o el vencimiento de la cobertura faculta al generador para suspender la operación sin que ello constituya incumplimiento de su parte.', status:'new'},
- {t:'SEXTA. CARGUE Y DESCARGUE', body:'Las labores de cargue y descargue de la mercancía serán asumidas en su costo por el remitente y/o el destinatario de la carga, sin perjuicio de que su ejecución material sea realizada por otros actores de la cadena de transporte, de conformidad con el artículo 2.2.1.7.6.9 del Decreto 1079 de 2015. Estas operaciones no excederán de ocho (8) horas contadas desde la cita programada, conforme al Decreto 1017 de 2025.', status:'new'},
- {t:'SÉPTIMA. CLÁUSULA PENAL', body:'En caso de incumplimiento de las obligaciones previstas en el contrato, la parte incumplida pagará a la otra una suma equivalente al 20% del valor del contrato, de conformidad con los artículos 1592 a 1601 del Código Civil.', status:'new'},
- {t:'OCTAVA. OBLIGACIONES DE LA EMPRESA DE TRANSPORTE', body:'La EMPRESA DE TRANSPORTE se obliga a: (i) contar con la habilitación y los vehículos idóneos; (ii) expedir el manifiesto electrónico de carga y registrarlo en el RNDC; (iii) cumplir las normas de tránsito y transporte aplicables.', status:'same'},
- {t:'NOVENA. DURACIÓN', body:'El presente contrato tendrá una duración de un (1) año contado a partir de su suscripción, prorrogable por acuerdo entre las partes.', status:'same'},
- {t:'DÉCIMA. SOLUCIÓN DE CONTROVERSIAS', body:'Las controversias derivadas del presente contrato que no puedan resolverse de común acuerdo se someterán a un tribunal de arbitramento del Centro de Arbitraje y Conciliación de la Cámara de Comercio de Bogotá, integrado por un (1) árbitro que decidirá en derecho, de conformidad con la Ley 1563 de 2012 y el reglamento del Centro.', status:'new'},
- {t:'DÉCIMA PRIMERA. VIGENCIA', body:'El presente contrato deja sin efecto cualquier acuerdo anterior entre las partes sobre la misma materia.', status:'same'},
-];
 let contratoDocOpen=false, contratoMejOpen=false;
-const contratoBaseScore=2.6;
-const contratoImpact={C1:0.6,C2:0.5,C3:0.3,C4:0.2,C5:0.1};
-let contratoImpl={};
-const contratoFindings=[
- {id:'C1',risk:'alto',area:'Responsabilidad',titulo:'Monto de indemnización por retraso en la entrega no está definido',
-  desc:'El contrato no fija el límite ni el alcance de la responsabilidad de la empresa de transporte frente al retraso en la entrega de la mercancía, lo que genera incertidumbre sobre la indemnización aplicable.',
-  base:['Código de Comercio — contrato de transporte'],
-  old:'La empresa de transporte responderá por la mercancía transportada conforme a la ley.',
-  new:'La empresa de transporte responderá por el retraso en la entrega de la mercancía respecto del plazo pactado. Las partes fijan como indemnización por cada día de retraso una suma equivalente a [__] del valor del flete, sin perjuicio de los demás perjuicios que se demuestren. Se exceptúan los eventos de causa extraña debidamente probados.'},
- {id:'C2',risk:'alto',area:'Seguros',titulo:'No se pactó un seguro de transporte de mercancías ni ningún otro seguro',
-  desc:'No existe una cláusula que obligue a la empresa de transporte a mantener vigente un seguro de transporte, ni ningún otro seguro que cubra la operación de transporte ante el incumplimiento de las obligaciones de la empresa de transporte.',
-  base:['Decreto 1079 de 2015','Código de Comercio, art. 1117'],
-  old:'(El contrato no contiene una cláusula de seguros de la mercancía.)',
-  new:'La empresa de transporte se obliga a mantener vigente, durante toda la operación de transporte, una póliza que ampare la mercancía por su valor declarado contra pérdida, hurto, saqueo y avería, y a acreditar dicha póliza ante el generador antes del cargue. La ausencia o el vencimiento de la cobertura faculta al generador para suspender la operación sin que ello constituya incumplimiento de su parte.'},
- {id:'C3',risk:'medio',area:'Cargue y descargue',titulo:'El pago del cargue y descargue es ambiguo',
-  desc:'El contrato no especifica quién asumirá el costo de las labores de cargue y descargue de las mercancías. Sin embargo, es preciso aclarar que, a pesar de que la labor puede ser ejecutada por otros actores, el costo siempre debe ser asumido por el remitente y/o destinatario.',
-  base:['Decreto 1079 de 2015, art. 2.2.1.7.6.9'],
-  old:'Las labores de cargue y descargue serán coordinadas por las partes según la operación.',
-  new:'Las labores de cargue y descargue de la mercancía serán asumidas en su costo por el remitente y/o el destinatario de la carga, sin perjuicio de que su ejecución material sea realizada por otros actores de la cadena de transporte, de conformidad con el artículo 2.2.1.7.6.9 del Decreto 1079 de 2015.'},
- {id:'C4',risk:'medio',area:'Cláusula penal',titulo:'Falta incluir una cláusula penal compensatoria',
-  desc:'La inclusión de una cláusula penal compensatoria permite a las partes establecer anticipadamente las consecuencias económicas derivadas de un eventual incumplimiento contractual, fijando de antemano el valor de los perjuicios asociados a este. De esta manera, ante el incumplimiento, el acreedor puede exigir el pago de la pena pactada sin necesidad de acreditar la existencia ni la cuantía de los perjuicios efectivamente sufridos, lo que facilita su reclamación y reduce la incertidumbre y los costos asociados a su determinación.',
-  base:['Código Civil, arts. 1592 a 1601'],
-  old:'(El contrato no incluye una cláusula penal.)',
-  new:'En caso de incumplimiento de las obligaciones previstas en el contrato, la parte incumplida pagará a la otra una suma equivalente al 20% del valor del contrato.'},
- {id:'C5',risk:'bajo',area:'Controversias',titulo:'No se pactó jurisdicción ni mecanismo de solución de controversias',
-  desc:'No se define el mecanismo (arbitraje, jurisdicción ordinaria) ni el domicilio para dirimir controversias, lo que puede dilatar eventuales reclamaciones.',
-  base:['Ley 1563 de 2012 (arbitraje)'],
-  old:'(El contrato no pacta jurisdicción ni mecanismo de solución de controversias.)',
-  new:'Las controversias derivadas del presente contrato que no puedan resolverse de común acuerdo se someterán a un tribunal de arbitramento del Centro de Arbitraje y Conciliación de la Cámara de Comercio de Bogotá, integrado por un (1) árbitro que decidirá en derecho, de conformidad con la Ley 1563 de 2012 y el reglamento del Centro.'},
-];
-
-/* Módulo 3 — Manifiesto */
-const manifiesto={
- numero:'01278713', autorizacion:'102064598', tipo:'General', expedicion:'13/05/2025',
- empresa:'TDM Transportes S.A.S.', empresaNit:'890.904.488-1',
- origen:'El Cerrito, Valle del Cauca', destino:'Cartagena (CONTECAR)',
- remitente:'Grupo NF S.A.S. · NIT 901.780.925', destinatario:'Contecar S.A. · NIT 800.116.164-0',
- vehiculo:'International · Placa JCR435 · Config. 3S2', poseedor:'Grupo NF S.A.S.',
- conductor:'N. S. S. · C.C. ****3579', mercancia:'Contenedor 40" — 19 pallets, sacos de 50 kg de azúcar refinada',
- peso:'28.110,5 kg', seguro:'MAPFRE Seguros · Póliza R42723',
- valorTotal:8200000, valorLetras:'OCHO MILLONES DOSCIENTOS MIL PESOS', saldo:8068000, ica:0,
- carguePor:'Remitente', descarguePor:'(sin diligenciar)', fechaPago:'21/12/2025', cumplimiento:3.1,
-};
-const manifiestoCampos=[
- {n:1,ok:true,t:'Identificación de la empresa de transporte'},
- {n:2,ok:true,t:'Tipo de manifiesto'},
- {n:3,ok:true,t:'Propietario, remitente y destinatario de la mercancía'},
- {n:4,ok:true,t:'Descripción del vehículo'},
- {n:5,ok:true,t:'Propietario, poseedor o tenedor del vehículo'},
- {n:6,ok:true,t:'Nombre e identificación del conductor'},
- {n:7,ok:true,t:'Descripción de la mercancía y su peso o volumen'},
- {n:8,ok:true,t:'Lugar y dirección de origen y destino'},
- {n:9,ok:true,t:'Valor a pagar en letras y números'},
- {n:10,ok:true,t:'Fecha en la que se realizará el pago'},
- {n:11,ok:true,t:'Manifestación sobre el saldo pendiente de pago'},
- {n:12,ok:false,t:'Tiempos de cargue y descargue (fechas y horas de llegada y salida)'},
- {n:13,ok:true,t:'Compañía de seguros y número de póliza'},
-];
-const manifiestoErrores=[
- {risk:'alto',t:'Retención de ICA en $0',
-  detalle:'El manifiesto registra retención de ICA en $0. Siempre debe existir un valor de ICA superior a cero.',
-  base:'Retención en la fuente por ICA aplicable al transporte',
-  actual:'RETENCIÓN ICA: $0', sugerido:'Liquidar y registrar un valor de ICA mayor a cero según la tarifa del municipio.'},
- {risk:'alto',t:'Falta el campo obligatorio "Tiempos de cargue y descargue"',
-  detalle:'No se diligenciaron las fechas y horas de llegada y salida del vehículo en cargue y descargue, campo mínimo obligatorio del manifiesto.',
-  base:'Decreto 1079 de 2015, art. 2.2.1.7.5.4, numeral 12',
-  actual:'Campo vacío', sugerido:'Registrar fecha y hora de llegada/salida en cargue y en descargue.'},
- {risk:'medio',t:'"Descargue pagado por" sin diligenciar',
-  detalle:'La casilla de descargue no indica quién asume el costo. El cargue y descargue debe ser pagado por el generador de carga, remitente o destinatario; si se diligencia con otra cosa, está mal.',
-  base:'Decreto 1079 de 2015, art. 2.2.1.7.6.9',
-  actual:'DESCARGUE PAGADO POR: (vacío)', sugerido:'Indicar "Remitente" o "Destinatario" como responsable del costo del descargue.'},
- {risk:'bajo',t:'Fecha de pago posterior en 7 meses a la expedición',
-  detalle:'El manifiesto se expide el 13/05/2025 y registra fecha de pago el 21/12/2025. Conviene verificar la consistencia de la fecha de pago pactada.',
-  base:'Consistencia de diligenciamiento',
-  actual:'Expedición 13/05/2025 · Pago 21/12/2025', sugerido:'Confirmar la fecha de pago real acordada con el titular del manifiesto.'},
-];
-
-/* Chat */
-const chatResponses={
- "¿La empresa de transporte tiene derecho de retención de la mercancía si no le pagan el flete?":`**Derecho de retención de la empresa de transporte**
-
-Sí. Por regla general, la empresa de transporte tiene un **derecho de retención** sobre la mercancía mientras no se le pague el valor del transporte (flete) y los gastos que la operación haya generado.
-
-- **Fundamento:** Código de Comercio, arts. 1033 y ss. (privilegio y retención de la empresa de transporte).
-- **Alcance:** opera como garantía del pago; **no** autoriza a disponer de la mercancía ni a apropiarse de ella.
-
-**Recomendación:** Capacitar al personal operativo sobre el derecho de la empresa de transporte a retener las mercancías en caso de falta de pago del flete, con el fin de prevenir retrasos en el cumplimiento de las obligaciones de pago y evitar eventuales afectaciones en la entrega de las mercancías.`,
- "¿Qué diferencia jurídica hay entre la remesa y el manifiesto de carga?":`**Remesa vs. Manifiesto de carga**
-
-Son documentos distintos y complementarios:
-
-- **Remesa terrestre de carga:** documento expedido por la empresa de transporte y entregado al remitente de la mercancía, en el que constan las especificaciones del artículo 1010 del Código de Comercio (nombre y dirección del destinatario, lugar de la entrega, naturaleza y valor de la mercancía, entre otras).
-- **Manifiesto electrónico de carga:** documento expedido por la empresa de transporte y entregado al propietario, poseedor o tenedor del vehículo, que presta **mérito ejecutivo**, en el que consta el valor a pagar, la información del vehículo de carga y el nombre del conductor, entre otros elementos.
-
-> **Fundamento:** Decreto 1079 de 2015 — transporte terrestre automotor de carga.`,
- "Si el manifiesto registra ICA en $0, ¿qué contingencia me genera?":`**Manifiesto con ICA en $0 — contingencia**
-
-Registrar la retención de ICA en cero cuando el servicio está gravado genera:
-
-1. **Contingencia tributaria:** menor retención frente a la exigida por el municipio, con riesgo de mayor valor a pagar, intereses y sanción.
-2. **Hallazgo de cumplimiento:** el manifiesto queda mal diligenciado — siempre debe existir un valor de ICA superior a cero.
-3. **Riesgo operativo** ante auditorías o supervisión.
-
-**Recomendación:** liquidar el ICA según la tarifa del municipio correspondiente y corregir el manifiesto.
-
-> **Nota:** conviene validar esta contingencia con un especialista tributario, pues el tratamiento aplicable puede variar según la normativa vigente.`,
- "¿Puedo trasladar por contrato el costo del descargue a la empresa de transporte?":`**¿Se puede trasladar el costo del descargue a la empresa de transporte?**
-
-No como regla. El costo de las labores de **cargue y descargue** corresponde al **remitente y/o destinatario** de la mercancía. Aunque la ejecución material pueda hacerla otro actor de la cadena, el costo final lo asumen el remitente y/o destinatario.
-
-- **Fundamento:** Decreto 1079 de 2015, art. 2.2.1.7.6.9.
-- Una cláusula que traslade ese costo a la empresa de transporte contraría la regla y es una **oportunidad de mejora / riesgo** en la revisión del contrato y del manifiesto.
-
-> En el manifiesto analizado, "descargue pagado por" está sin diligenciar: debe indicar remitente o destinatario.`,
- "Con el Decreto 1017 de 2025, ¿qué cambió en los tiempos de cargue y descargue?":`**Decreto 1017 de 2025 — cargue y descargue**
-
-El Decreto 1017 de 2025 (que modifica el Capítulo 7 del Decreto 1079 de 2015) endureció las reglas:
-
-- **Límite de 8 horas** para las operaciones de cargue y descargue, contadas desde la cita programada.
-- Si se excede ese plazo, hay **penalidad**: **3 SMLDV** por hora adicional en vehículos **articulados** y **2 SMLDV** en **rígidos**.
-- Reafirma que el flete **no puede ser inferior** a los costos eficientes del **SICE-TAC**.
-
-**Recomendación:** ajuste sus contratos y su control de tiempos para registrar horas de llegada/salida y soportar eventuales penalidades.
-
-> Conecta directamente con el campo faltante del manifiesto: *tiempos de cargue y descargue*.`,
- "¿Qué sanciones arriesga la empresa de transporte por operar con un manifiesto mal diligenciado?":`**Riesgos por un manifiesto mal diligenciado**
-
-Estos riesgos recaen sobre la **empresa de transporte**, no sobre el generador de carga (a quien va dirigido este *due diligence*). Un manifiesto con errores u omisiones lo expone a varios frentes:
-
-1. **Supervisión de la Superintendencia de Transporte:** hallazgos, requerimientos y sanciones por incumplimiento de la reglamentación del RNDC y del SICE-TAC.
-2. **Contingencia tributaria:** una retención de ICA en $0 o una liquidación incorrecta puede derivar en mayor valor a pagar, intereses y sanción.
-3. **Riesgo probatorio:** el manifiesto se genera con **mérito ejecutivo**; datos errados debilitan su valor como título y la posición de la empresa de transporte ante reclamaciones.
-4. **Operativo:** pagos por debajo del SICE-TAC o campos incompletos pueden impedir la expedición o el registro en el RNDC.
-
-**Recomendación:** corregir los hallazgos del módulo de manifiesto (ICA, tiempos de cargue/descargue, responsable del descargue) antes del despacho.`,
-};
 
 /* ===== Sidebar + router ===== */
 const navItems=[
@@ -562,13 +323,13 @@ document.getElementById('toggleBtn').onclick=()=>{
 /* ===== Gauge (institucional) ===== */
 const scoreColorInst=s=>s>=4?'#2f7d5b':s>=3?'#a97e28':s>=2?'#b5652a':'#b23b3b';
 const riesgoLabel=s=>s>=4.5?'Riesgo Bajo':s>=4?'Riesgo Bajo-Medio':s>=3?'Riesgo Medio':s>=2?'Riesgo Moderado-Alto':'Riesgo Alto';
-function panelScore(){if(PANEL&&PANEL.panelScore!=null)return Number(PANEL.panelScore);return Math.round(((contratoScore().score+manifiesto.cumplimiento)/2)*10)/10;}
-function updateSideScore(){const ps=panelScore();const el=document.getElementById('sideScore');if(el)el.textContent='Cumplimiento: '+ps.toFixed(1)+'/5';
- const c=scoreColor(ps);['sideDotPing','sideDotCore'].forEach(id=>{const d=document.getElementById(id);if(d)d.style.background=c;});
+function panelScore(){return PANEL&&PANEL.panelScore!=null?Number(PANEL.panelScore):null;}
+function updateSideScore(){const ps=panelScore();const el=document.getElementById('sideScore');if(el)el.textContent='Cumplimiento: '+(ps==null?'—':ps.toFixed(1)+'/5');
+ const c=ps==null?'#8a97a3':scoreColor(ps);pintarEmpresa();['sideDotPing','sideDotCore'].forEach(id=>{const d=document.getElementById(id);if(d)d.style.background=c;});
  const l=document.querySelector('.score-lbl');if(l)l.style.color=c;}
 function arcPt(p,r){return [100-r*Math.cos(Math.PI*p),100-r*Math.sin(Math.PI*p)];}
 function gaugeSeg(p0,p1,color){const[a,b]=arcPt(p0,80);const[c,d]=arcPt(p1,80);return `<path d="M ${a.toFixed(2)} ${b.toFixed(2)} A 80 80 0 0 1 ${c.toFixed(2)} ${d.toFixed(2)}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" opacity=".9"/>`;}
-function gaugeSVG(score){
+function gaugeSVG(score,sinAguja){
  const angle=(score/5)*180-90;
  let ticks='';
  for(let m=0;m<=5;m++){const t=m/5;const[a,b]=arcPt(t,74);const[c,d]=arcPt(t,86);const[lx,ly]=arcPt(t,95);
@@ -579,44 +340,46 @@ function gaugeSVG(score){
   ${gaugeSeg(0,0.4,'#e05252')}
   ${gaugeSeg(0.4,0.7,'#e8933a')}
   ${gaugeSeg(0.7,1,'#2ecc71')}
-  <g style="transform-origin:100px 100px;transform:rotate(${angle}deg);transition:transform 1s cubic-bezier(.2,.8,.2,1)"><polygon points="100,30 97,100 103,100" fill="#1D3A45"/></g>
-  <circle cx="100" cy="100" r="8.5" fill="#1D3A45"/><circle cx="100" cy="100" r="3.5" fill="#fff"/>
+  ${sinAguja?'':`<g style="transform-origin:100px 100px;transform:rotate(${angle}deg);transition:transform 1s cubic-bezier(.2,.8,.2,1)"><polygon points="100,30 97,100 103,100" fill="#1D3A45"/></g>
+  <circle cx="100" cy="100" r="8.5" fill="#1D3A45"/><circle cx="100" cy="100" r="3.5" fill="#fff"/>`}
  </svg>`;
 }
 function gaugeBlock(score){
- return `<div style="display:flex;flex-direction:column;align-items:center">${gaugeSVG(score)}
+ const vacio=score==null;
+ return `<div style="display:flex;flex-direction:column;align-items:center;${vacio?'opacity:.55':''}">${gaugeSVG(vacio?0:score,vacio)}
   <div style="margin-top:2px;display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums">
-   <span style="font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1;color:${scoreColor(score)}">${score.toFixed(1)}</span>
+   <span style="font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1;color:${vacio?'#8a97a3':scoreColor(score)}">${vacio?'—':score.toFixed(1)}</span>
    <span style="font-size:15px;color:var(--muted);font-weight:600">/ 5.0</span></div></div>`;
 }
 
 /* ===== Dashboard ===== */
-const ACT_STYLE={manifiesto:['truck','#e05252'],norma:['news','#EABC1F'],contrato:['scale','#254B59'],boletin:['news','#C9A018'],contraparte:['building','#254B59'],proceso:['scale','#7a5c99']};
+const ACT_STYLE={manifiesto:['truck','#e05252'],norma:['news','#EABC1F'],contrato:['scale','#254B59'],boletin:['news','#C9A018'],contraparte:['building','#254B59'],proceso:['scale','#7a5c99'],empresa:['building','#C9A018']};
 function kpisVista(){
- if(!PANEL)return kpis;const k=PANEL.kpis;
+ if(!PANEL)return kpis.map(k=>({...k,n:'—'}));const k=PANEL.kpis;
  return [{...kpis[0],n:k.normasNuevasSemana},{...kpis[1],n:k.contratos},{...kpis[2],n:k.manifiestos},{...kpis[3],n:k.hallazgosActivos}];
 }
 function actividadVista(){
- if(!PANEL)return activity;
- if(!PANEL.actividad.length)return [{ic:'bell',col:'#8a97a3',t:'Sin actividad registrada',s:'Los análisis que realice aparecerán aquí.',time:''}];
+ if(!PANEL)return [{ic:'bell',col:'#8a97a3',t:errorServidor?'Sin conexión con el servidor':'Cargando actividad…',s:'',time:''}];
+ if(!PANEL.actividad.length)return [{ic:'bell',col:'#8a97a3',t:'Aún no hay actividad',s:'Cargue un contrato o un manifiesto, o analice la normativa, para empezar.',time:''}];
  return PANEL.actividad.map(e=>{const st=ACT_STYLE[e.tipo]||['bell','#254B59'];return {ic:st[0],col:st[1],t:esc(e.titulo),s:esc(e.detalle||''),time:hace(e.created_at)};});
 }
 function modulosVista(){
- if(!PANEL)return modules;
- const m=modules.map(x=>({...x}));
+ const m=modules.map(x=>({...x,tag:'—'}));
+ if(!PANEL)return m;
  m[0].tag=PANEL.kpis.normasNuevasSemana+' novedades';
- if(PANEL.contrato)m[1].tag='Riesgo '+Number(PANEL.contrato.score).toFixed(1)+'/5';
- if(PANEL.manifiesto)m[2].tag=PANEL.manifiesto.hallazgos+' hallazgos';
+ m[1].tag=PANEL.contrato?'Riesgo '+Number(PANEL.contrato.score).toFixed(1)+'/5':'Sin contratos';
+ m[2].tag=PANEL.manifiesto?PANEL.manifiesto.hallazgos+' hallazgos':'Sin manifiestos';
  return m;
 }
 async function cargarPanel(){
- try{PANEL=await api('/api/lc/panel');renderDashboard();updateSideScore();}catch(e){respaldo(e);}
+ try{PANEL=await api('/api/lc/panel');errorServidor=false;renderDashboard();updateSideScore();
+  if(!PANEL.empresa&&!bienvenidaVista){bienvenidaVista=true;abrirBienvenida();}}catch(e){respaldo(e);}
 }
 function renderDashboard(){
  const ps=panelScore();const kpisV=kpisVista(),activityV=actividadVista(),modulesV=modulosVista();
  document.getElementById('view-dashboard').innerHTML=`
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-   <div><h1 class="page">Panel de Control</h1><p class="sub">Transportes Andinos de Carga S.A.S. · Legal Intelligence del sector transporte</p></div>
+   <div><h1 class="page">Panel de Control</h1><p class="sub">${PANEL&&PANEL.empresa?esc(PANEL.empresa.razon_social):'Su empresa'} · Legal Intelligence del sector transporte</p></div>
    <div class="glass-sm" style="padding:8px 16px;font-size:12px;color:var(--muted)">${mesActual()}</div>
   </div>
   <div style="display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-top:24px" class="grid-kpi">
@@ -650,9 +413,9 @@ function renderDashboard(){
    <div class="glass-score" style="padding:24px;display:flex;flex-direction:column;align-items:center;height:fit-content">
     <p style="font-size:11px;font-weight:700;color:var(--muted);align-self:flex-start;margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(37,75,89,.1);padding-bottom:8px;width:100%">Índice de Cumplimiento</p>
     ${gaugeBlock(ps)}
-    <div style="display:flex;justify-content:center;margin-top:10px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:${scoreColor(ps)};border:1px solid ${scoreColor(ps)}59;border-radius:6px;padding:4px 12px"><span style="width:7px;height:7px;border-radius:50%;background:${scoreColor(ps)}"></span>${riesgoLabel(ps)}</span></div>
+    <div style="display:flex;justify-content:center;margin-top:10px">${ps==null?`<span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8a97a3;border:1px solid #c3ccd6;border-radius:6px;padding:4px 12px">Sin datos</span>`:`<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:${scoreColor(ps)};border:1px solid ${scoreColor(ps)}59;border-radius:6px;padding:4px 12px"><span style="width:7px;height:7px;border-radius:50%;background:${scoreColor(ps)}"></span>${riesgoLabel(ps)}</span>`}</div>
     <div class="glass-gold" style="margin-top:16px;padding:12px;width:100%">
-     <p style="font-size:12px;color:var(--muted)">${PANEL&&PANEL.contrato&&PANEL.manifiesto?`Promedio del contrato activo (<strong>${Number(PANEL.contrato.score).toFixed(1)}</strong>) y del manifiesto N.º ${esc(PANEL.manifiesto.numero)} (<strong>${Number(PANEL.manifiesto.score).toFixed(1)}</strong>). Implementar las mejoras del contrato y corregir el manifiesto sube el índice.`:'Promedio del puntaje del contrato y del manifiesto analizados.'}</p></div>
+     <p style="font-size:12px;color:var(--muted)">${PANEL&&PANEL.contrato&&PANEL.manifiesto?`Promedio del contrato activo (<strong>${Number(PANEL.contrato.score).toFixed(1)}</strong>) y del manifiesto N.º ${esc(PANEL.manifiesto.numero)} (<strong>${Number(PANEL.manifiesto.score).toFixed(1)}</strong>). Implementar las mejoras del contrato y corregir el manifiesto sube el índice.`:(PANEL&&(PANEL.contrato||PANEL.manifiesto)?'Índice calculado con el documento analizado. Cargue también '+(PANEL.contrato?'un manifiesto':'un contrato')+' para completar el promedio.':'Cargue un contrato y un manifiesto de carga para calcular el índice de cumplimiento.')}</p></div>
     <button class="glass-btn-primary" style="margin-top:16px;width:100%;padding:10px" onclick="go('chat')">Preguntar al Asistente IA</button>
    </div>
   </div>`;
@@ -677,10 +440,7 @@ async function startAnalisis(){
   aviso(ANALISIS.creadas.length?ANALISIS.creadas.length+' normas nuevas verificadas en fuentes oficiales.':'No se encontraron normas nuevas verificables.','ok');
   cargarPanel();
  }catch(e){
-  // Respaldo: en modo sin servidor se muestran las novedades de demostración
-  if(!normasDesdeBD){analisisDone=true;ANALISIS=null;nuevasIds=normasNuevas.map(n=>n.id);
-   listaNormas=[...normasNuevas.filter(n=>!listaNormas.some(x=>x.id===n.id)),...listaNormas];respaldo(e);}
-  else aviso('No se pudo completar el análisis: '+e.message,'error');
+  aviso('No se pudo completar el análisis: '+e.message,'error');
  }finally{analisisLoading=false;renderNormativa();}
 }
 async function cargarBoletin(){try{const j=await api('/api/lc/boletin');if(j.boletin)BOLETIN=j.boletin;}catch(e){}}
@@ -689,8 +449,8 @@ async function startBoletin(){
  if(boletinOpen){boletinOpen=false;renderNormativa();return;}
  boletinLoading=true;renderNormativa();
  try{const j=await api('/api/lc/boletin',{method:'POST',timeout:200000});BOLETIN=j.boletin;aviso('Boletín N.º '+BOLETIN.numero+' generado y guardado.','ok');cargarPanel();}
- catch(e){if(normasDesdeBD)aviso('No se pudo generar el boletín: '+e.message+(BOLETIN?' Se muestra el último guardado.':''),'error');else respaldo(e);}
- finally{boletinLoading=false;boletinOpen=true;renderNormativa();
+ catch(e){aviso('No se pudo generar el boletín: '+e.message+(BOLETIN?' Se muestra el último guardado.':''),'error');}
+ finally{boletinLoading=false;boletinOpen=!!BOLETIN;renderNormativa();
   const el=document.getElementById('boletinBox');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 }
 function exportarBoletin(fmt){
@@ -708,7 +468,7 @@ function loaderCard(txt,fuentesList){
   </div>`;
 }
 function renderNormativa(){
- const nuevasCount=analisisDone?(ANALISIS?ANALISIS.creadas.length:normasNuevas.length):0;
+ const nuevasCount=analisisDone&&ANALISIS?ANALISIS.creadas.length:0;
  document.getElementById('view-normativa').innerHTML=`
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
    <div><h1 class="page">Actualización Normativa</h1><p class="sub">Vigilancia continua de fuentes oficiales del sector transporte de carga</p></div>
@@ -733,7 +493,7 @@ function renderNormativa(){
     ${(filtroEntidad!=='todas'||filtroCat!=='todas')?`<button class="glass-pill" onclick="filtroEntidad='todas';filtroCat='todas';renderNormativa()">Limpiar filtros</button>`:''}
    </div>`;})()}
   ${(()=>{const vis=listaNormas.filter(n=>(filtroEntidad==='todas'||n.entidad===filtroEntidad)&&(filtroCat==='todas'||n.cat===filtroCat));
-   if(!vis.length)return `<div class="glass" style="padding:24px;margin-top:16px;text-align:center;color:var(--muted);font-size:13px">No hay normas que coincidan con el filtro.</div>`;
+   if(!vis.length)return `<div class="glass" style="padding:24px;margin-top:16px;text-align:center;color:var(--muted);font-size:13px">${!normasDesdeBD?(errorServidor?'No fue posible cargar las normas: sin conexión con el servidor.':'Cargando normas…'):listaNormas.length?'No hay normas que coincidan con el filtro.':'Aún no hay normas registradas. Use "Analizar nueva normativa" para consultar las fuentes oficiales.'}</div>`;
    return `<p style="font-size:12px;color:var(--muted);margin-top:12px">${vis.length} de ${listaNormas.length} normas</p><div style="margin-top:8px;display:flex;flex-direction:column;gap:12px">
    ${vis.map(n=>{const isNew=nuevasIds.includes(n.id);return `<div class="glass-finding" style="padding:16px;border-left:4px solid ${n.estado==='proyecto'?'#d4871a':n.estado==='vigente'?'#254B59':'#EABC1F'};${isNew?'box-shadow:0 0 0 2px rgba(46,204,113,.35);animation:fade .5s ease':''}">
      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -757,10 +517,8 @@ function renderNormativa(){
     </div>`}).join('')}</div>`;})()}`;
 }
 function renderBoletin(){
- let secciones,intro='',periodo=mesActual().toUpperCase(),numero=29;
- if(BOLETIN){secciones=BOLETIN.contenido.secciones;intro=BOLETIN.contenido.intro;periodo=BOLETIN.periodo;numero=BOLETIN.numero;}
- else{const byEnt={};listaNormas.forEach(n=>{(byEnt[n.entidad]=byEnt[n.entidad]||[]).push(n)});
-  secciones=Object.keys(byEnt).map(ent=>({entidad:ent,items:byEnt[ent].map(n=>({codigo:n.id,titulo:n.titulo,tema:n.tema,resumen:n.resumen,url:n.url}))}));}
+ if(!BOLETIN)return '';
+ const secciones=BOLETIN.contenido.secciones,intro=BOLETIN.contenido.intro,periodo=BOLETIN.periodo,numero=BOLETIN.numero;
  const serif="Georgia,'Times New Roman',serif";
  let counter=0;
  return `<div id="boletinBox" style="margin-top:20px">
@@ -835,14 +593,9 @@ function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 /* ===== Módulo 2: Contratos ===== */
 let contratoExpanded=null, diffOpen={};
 let CT=null, CT_LIST=[], ctCargando=false, ctArchivo='', ctImplementando=null, ctExportOpen=false;
-function contratoScore(){
- if(CT)return {score:CT.contrato.score,add:CT.contrato.add};
- const add=Object.keys(contratoImpl).filter(k=>contratoImpl[k]).reduce((a,k)=>a+(contratoImpact[k]||0),0);return{score:Math.min(contratoBaseScore+add,5),add:add};
-}
+function contratoScore(){return CT?{score:CT.contrato.score,add:CT.contrato.add}:{score:null,add:0};}
 function contratoVista(){
- if(!CT)return {c:contrato,texto:contratoTexto,archivo:'',original:false,
-  findings:contratoFindings.map(f=>({...f,imp:contratoImpact[f.id],impl:!!contratoImpl[f.id]})),
-  propuesta:contratoClausulasMejorado,titulo:'CONTRATO DE TRANSPORTE TERRESTRE DE CARGA'};
+ if(!CT)return null;
  const k=CT.contrato;
  const ORD=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA','SEXTA','SÉPTIMA','OCTAVA','NOVENA','DÉCIMA','DÉCIMA PRIMERA','DÉCIMA SEGUNDA','DÉCIMA TERCERA','DÉCIMA CUARTA','DÉCIMA QUINTA','DÉCIMA SEXTA','DÉCIMA SÉPTIMA','DÉCIMA OCTAVA','DÉCIMA NOVENA','VIGÉSIMA'];
  return {c:{nombre:k.nombre,partes:k.partes||'',fecha:k.fecha||'—',clausulas:k.num_clausulas},texto:k.texto_original,archivo:k.archivo_nombre||'',original:k.tiene_original,
@@ -883,7 +636,7 @@ async function cambiarContrato(id){
  catch(e){aviso('No se pudo abrir el contrato: '+e.message,'error');}
 }
 async function implementar(id){
- if(!CT){contratoImpl[id]=true;renderContratos();renderDashboard();updateSideScore();return;}
+ if(!CT)return;
  if(ctImplementando)return;ctImplementando=id;renderContratos();
  try{CT=await api('/api/lc/contratos/'+CT.contrato.id+'/implementar',{method:'POST',body:{codigo:id}});
   const it=CT_LIST.find(x=>x.id===CT.contrato.id);if(it)it.score=CT.contrato.score;
@@ -896,6 +649,21 @@ function exportarContrato(fmt,version){
  const a=document.createElement('a');a.href='/api/lc/contratos/'+CT.contrato.id+'/export?format='+fmt+'&version='+(version||'propuesta');a.download='';document.body.appendChild(a);a.click();a.remove();
 }
 function renderContratos(){
+ if(!CT){
+  document.getElementById('view-contratos').innerHTML=`
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+   <div><h1 class="page">Revisión de Contratos</h1><p class="sub">Análisis de cláusulas, riesgos, faltantes y redacción mejorada</p></div>
+   <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${ctCargando?';opacity:.7':''}" ${ctCargando?'disabled':''} onclick="elegirContrato()">${I.upload}Cargar contrato</button>
+  </div>
+  <div class="glass-upload" style="padding:36px 20px;margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center" onclick="elegirContrato()"
+   ondragover="event.preventDefault()" ondrop="event.preventDefault();if(event.dataTransfer.files[0])subirContrato(event.dataTransfer.files[0])">
+   <div style="display:flex;height:56px;width:56px;align-items:center;justify-content:center;border-radius:14px;background:rgba(234,188,31,.2);color:#EABC1F">${I.upload}</div>
+   <p style="font-weight:600;font-size:15px">${errorServidor?'Sin conexión con el servidor':'Aún no hay contratos analizados'}</p>
+   <p class="sub" style="font-size:13px;max-width:520px">Arrastre aquí un contrato de transporte en PDF o DOCX, o haga clic para elegirlo. El análisis identifica cláusulas, riesgos para el generador, cláusulas faltantes y propone una redacción mejorada (hasta 2 minutos).</p>
+  </div>
+  ${ctCargando?loaderCard('Analizando '+esc(ctArchivo)+'…','Extrayendo el texto · identificando cláusulas · evaluando riesgos para el generador · redactando mejoras (puede tardar hasta 2 minutos)'):''}`;
+  return;
+ }
  const V=contratoVista(),c=V.c;
  const cs=contratoScore();
  const csLabel=cs.score>=4.5?'Riesgo Bajo':cs.score>=4?'Riesgo Bajo-Medio':cs.score>=3?'Riesgo Medio':cs.score>=2?'Riesgo Moderado-Alto':'Riesgo Alto';
@@ -995,7 +763,7 @@ function renderContratos(){
 let MANIF=null, MANIF_HIST=[], manifCargando=false, manifArchivo='', vehCargando=false;
 const pesoKg=v=>new Intl.NumberFormat('es-CO',{maximumFractionDigits:1}).format(v)+' kg';
 function manifVista(){
- if(!MANIF)return {m:manifiesto,campos:manifiestoCampos,errores:manifiestoErrores,score:manifiesto.cumplimiento,archivo:''};
+ if(!MANIF)return null;
  const d=MANIF.datos||{};const o=x=>x||{};
  const P=x=>[o(x).nombre,o(x).identificacion].filter(Boolean).join(' · ');
  const V=o(d.vehiculo),M=o(d.mercancia),S=o(d.seguro);
@@ -1049,6 +817,21 @@ async function verManifiesto(id){
  catch(e){aviso('No se pudo abrir el manifiesto: '+e.message,'error');}
 }
 function renderManifiesto(){
+ if(!MANIF){
+  document.getElementById('view-manifiesto').innerHTML=`
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+   <div><h1 class="page">Análisis de Manifiesto de Carga</h1><p class="sub">Verificación contra el Decreto 1079 de 2015 y buenas prácticas del sector</p></div>
+   <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${manifCargando?';opacity:.7':''}" ${manifCargando?'disabled':''} onclick="elegirManifiesto()">${I.upload}Cargar manifiesto</button>
+  </div>
+  <div class="glass-upload" style="padding:36px 20px;margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center" onclick="elegirManifiesto()"
+   ondragover="event.preventDefault()" ondrop="event.preventDefault();if(event.dataTransfer.files[0])subirManifiesto(event.dataTransfer.files[0])">
+   <div style="display:flex;height:56px;width:56px;align-items:center;justify-content:center;border-radius:14px;background:rgba(224,82,82,.12);color:#e05252">${I.truck}</div>
+   <p style="font-weight:600;font-size:15px">${errorServidor?'Sin conexión con el servidor':'Aún no hay manifiestos revisados'}</p>
+   <p class="sub" style="font-size:13px;max-width:520px">Arrastre aquí el PDF de un manifiesto electrónico de carga, o haga clic para elegirlo. Se extraen los datos y se verifican los 13 campos del art. 2.2.1.7.5.4 del Decreto 1079 de 2015, el plazo de pago, los tiempos de cargue y descargue y el piso SICE-TAC.</p>
+  </div>
+  ${manifCargando?loaderCard('Analizando '+esc(manifArchivo)+'…','Extrayendo datos con IA · verificando los 13 campos del art. 2.2.1.7.5.4 · reglas de pago, tiempos y SICE-TAC'):''}`;
+  return;
+ }
  const Vm=manifVista(),m=Vm.m;
  const okCount=Vm.campos.filter(c=>c.ok).length;
  const kv=(k,v)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
@@ -1288,6 +1071,84 @@ function renderContrapartes(){
   <div class="glass-security" style="padding:14px;margin-top:20px;font-size:12px;color:var(--muted);text-align:center">Fuentes oficiales consultadas en vivo vía Croma. Solo se consulta por NIT, placa o radicado; no se consultan datos de personas naturales.</div>`;
 }
 
+/* ===== Empresa cliente: bienvenida y perfil ===== */
+let bienvenidaVista=false, BIEN={paso:'nit',cargando:false,propuesta:null};
+function pintarEmpresa(){
+ const e=PANEL&&PANEL.empresa;const n=document.getElementById('empNombre'),d=document.getElementById('empNit'),pl=document.getElementById('empPlan');
+ if(n)n.textContent=e?e.razon_social:'Su empresa';
+ if(d)d.textContent=e?('NIT: '+e.nit+(e.dv?'-'+e.dv:'')):'Configure su empresa';
+ if(pl)pl.textContent=e&&e.actividad?e.actividad.slice(0,34):'Generador de carga';
+}
+function abrirBienvenida(editar){
+ const e=PANEL&&PANEL.empresa;
+ BIEN={paso:editar&&e?'form':'nit',cargando:false,propuesta:editar&&e?{...e,encontrada:e.fuente==='rues'}:null};
+ renderBienvenida();
+}
+function renderBienvenida(){
+ const e=PANEL&&PANEL.empresa,p=BIEN.propuesta||{};
+ const campo=(id,label,val,extra)=>`<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">${label}<input id="${id}" class="sel" style="padding:9px 11px;font-size:14px" value="${esc(val||'')}" ${extra||''}></label>`;
+ document.getElementById('modalRoot').innerHTML=`
+  <div class="modal-back">
+   <div class="modal-card" style="max-width:560px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+     <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;height:44px;width:44px;align-items:center;justify-content:center;border-radius:12px;background:rgba(234,188,31,.14);color:#C9A018">${I.building}</div>
+      <div><h2 style="font-size:18px;font-weight:700">${e?'Datos de su empresa':'Bienvenido a Logicompliance'}</h2>
+       <p style="font-size:12.5px;color:var(--muted)">${e?'Actualice el perfil de la empresa que contrata el transporte.':'Registre la empresa generadora de carga para personalizar el análisis.'}</p></div>
+     </div>
+     ${e?`<button class="icon-x" onclick="closeModal()">${I.x}</button>`:''}
+    </div>
+    ${BIEN.paso==='nit'?`
+     <div style="margin-top:18px">
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600">NIT de su empresa
+       <input id="bienNit" class="sel" style="padding:11px 12px;font-size:15px" placeholder="p. ej. 900.123.456-7" onkeydown="if(event.key==='Enter')buscarRues()"></label>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Consultamos el RUES para completar la razón social, la actividad y la representación legal. Podrá revisar y corregir los datos antes de guardarlos.</p>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
+       <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${BIEN.cargando?';opacity:.7':''}" ${BIEN.cargando?'disabled':''} onclick="buscarRues()">${BIEN.cargando?`<span class="spin" style="width:15px;height:15px;display:inline-flex">${I.compass}</span>Consultando el RUES...`:`${I.shield}Buscar en el RUES`}</button>
+       <button class="glass-pill" onclick="BIEN={paso:'form',cargando:false,propuesta:{nit:(document.getElementById('bienNit')||{}).value||'',encontrada:false}};renderBienvenida()">Ingresar los datos manualmente</button>
+       ${!e?`<button class="glass-pill" onclick="closeModal()">Más tarde</button>`:''}
+      </div>
+     </div>`:`
+     <div style="margin-top:16px">
+      ${p.encontrada?`<p style="font-size:12.5px;color:#2f7d5b;margin-bottom:12px">Datos tomados del RUES${p.camara?' (Cámara de Comercio de '+esc(p.camara)+')':''}. Revíselos antes de guardar.</p>`:`<p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">${p.nit&&BIEN.buscado?'No encontramos el NIT en el RUES. ':''}Complete los datos de la empresa.</p>`}
+      <div style="display:grid;gap:12px;grid-template-columns:2fr 1fr">
+       ${campo('bienNitF','NIT',p.nit)}${campo('bienDv','DV',p.dv,'maxlength="2"')}
+      </div>
+      <div style="display:grid;gap:12px;margin-top:12px">
+       ${campo('bienRazon','Razón social',p.razon_social)}
+       ${campo('bienAct','Actividad principal',p.actividad)}
+       ${campo('bienMun','Municipio',p.municipio)}
+      </div>
+      ${(p.representantes||[]).length?`<p style="font-size:12px;color:var(--muted);margin-top:10px">Representación legal: ${esc(p.representantes.map(r=>r.nombre).join(', '))}</p>`:''}
+      <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+       <button class="glass-btn-primary" style="padding:10px 16px${BIEN.cargando?';opacity:.7':''}" ${BIEN.cargando?'disabled':''} onclick="guardarEmpresaUI()">${BIEN.cargando?'Guardando...':'Guardar'}</button>
+       <button class="glass-pill" onclick="BIEN={paso:'nit',cargando:false,propuesta:null};renderBienvenida()">Buscar otro NIT</button>
+      </div>
+     </div>`}
+   </div>
+  </div>`;
+ const f=document.getElementById(BIEN.paso==='nit'?'bienNit':'bienRazon');if(f)f.focus();
+}
+async function buscarRues(){
+ const nit=((document.getElementById('bienNit')||{}).value||'').trim();
+ if(!nit){aviso('Escriba el NIT de su empresa.','error');return;}
+ BIEN.cargando=true;renderBienvenida();
+ try{const j=await api('/api/lc/empresa',{method:'POST',body:{accion:'rues',nit},timeout:90000});
+  BIEN={paso:'form',cargando:false,propuesta:j.propuesta,buscado:true};}
+ catch(e){BIEN={paso:'form',cargando:false,propuesta:{nit,encontrada:false},buscado:true};aviso('No fue posible consultar el RUES: '+e.message+'. Puede ingresar los datos manualmente.','error');}
+ renderBienvenida();
+}
+async function guardarEmpresaUI(){
+ const v=id=>((document.getElementById(id)||{}).value||'').trim();
+ const p=BIEN.propuesta||{};
+ const body={nit:v('bienNitF'),dv:v('bienDv'),razon_social:v('bienRazon'),actividad:v('bienAct')||null,municipio:v('bienMun')||null,
+  camara:p.camara||null,ciiu:p.ciiu||null,estado:p.estado||null,representantes:p.representantes||[],fuente:p.encontrada?'rues':'manual'};
+ if(!body.nit||!body.razon_social){aviso('El NIT y la razón social son obligatorios.','error');return;}
+ BIEN.cargando=true;renderBienvenida();
+ try{const j=await api('/api/lc/empresa',{method:'POST',body});if(PANEL)PANEL.empresa=j.empresa;closeModal();pintarEmpresa();renderDashboard();aviso('Empresa registrada: '+j.empresa.razon_social+'.','ok');cargarPanel();}
+ catch(e){BIEN.cargando=false;renderBienvenida();aviso('No se pudo guardar: '+e.message,'error');}
+}
+
 /* ===== Chat ===== */
 function mdToHtml(md){
  md=esc(md).replace(/&quot;/g,'"').replace(/^\s*⟦consulta⟧\s*(.+)$/gm,'⟦c⟧$1');
@@ -1308,7 +1169,7 @@ function mdToHtml(md){
   else{flush();html+=`<p>${inl(l)}</p>`}
  });flush();return html;
 }
-const quickActions=["¿La empresa de transporte tiene derecho de retención de la mercancía si no le pagan el flete?","¿Qué diferencia jurídica hay entre la remesa y el manifiesto de carga?","Si el manifiesto registra ICA en $0, ¿qué contingencia me genera?","¿Puedo trasladar por contrato el costo del descargue a la empresa de transporte?","Con el Decreto 1017 de 2025, ¿qué cambió en los tiempos de cargue y descargue?","¿Qué sanciones arriesga la empresa de transporte por operar con un manifiesto mal diligenciado?"];
+const quickActions=["¿Qué riesgos tiene para mí el contrato de transporte activo?","Resume los hallazgos del manifiesto activo y cómo corregirlos","¿Qué cambió con el Decreto 1017 de 2025 en los tiempos de cargue y descargue?","Verifica en registros oficiales la empresa de transporte del manifiesto activo","¿Quién debe pagar el cargue y el descargue de la mercancía?","¿Qué cláusulas mínimas debe tener un contrato de transporte de carga para proteger al generador?"];
 let chatMsgs=[{role:'assistant',content:`**Asistente Legal · Sector Transporte**\n\nTengo acceso al perfil de su empresa: novedades normativas, contratos analizados y manifiestos revisados.\n\n¿En qué puedo ayudarle hoy?`}];
 let chatLoading=false, chatNorma=null, chatHistCargado=false;
 async function cargarChat(){
@@ -1376,9 +1237,8 @@ async function sendChat(text){
  }catch(e){
   console.warn('[chat respaldo]',e&&e.message);
   const i=chatMsgs.indexOf(msg);if(i>=0)chatMsgs.splice(i,1);
-  const pre=chatResponses[q];
-  chatMsgs.push({role:'assistant',content:pre||'No fue posible conectar con el asistente en este momento. Intente de nuevo en unos segundos.',at:new Date().toISOString(),respaldo:!!pre});
-  aviso(pre?'El asistente no respondió a tiempo: se muestra una respuesta de respaldo.':'No fue posible conectar con el asistente.',pre?undefined:'error');
+  chatMsgs.push({role:'assistant',content:'No fue posible conectar con el asistente en este momento. Intente de nuevo en unos segundos.',at:new Date().toISOString()});
+  aviso('No fue posible conectar con el asistente.','error');
  }finally{msg.stream=false;chatLoading=false;renderChat();}
 }
 
@@ -1391,7 +1251,7 @@ go('dashboard');
 cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();cargarChat();cargarBoletin();cargarContrapartes();cargarProcesos();
 
 /* logout real: borra la cookie de sesión en el servidor */
-function logout(){if(!PANEL&&!normasDesdeBD){aviso('Modo demostración: no hay una sesión de servidor que cerrar.');return;}fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}
+function logout(){fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}
 window.showLogin=logout;
 </script>
 <style>

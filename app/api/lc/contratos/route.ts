@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { isAuthed, unauthorized, fail } from '@/lib/lc/session'
-import { db, must } from '@/lib/lc/db'
+import { db, must, ESPACIO } from '@/lib/lc/db'
 import { extraerTexto, analizarContrato, detalleContrato } from '@/lib/lc/contratos-srv'
 import { guardarArchivo } from '@/lib/lc/storage'
 import { CupoAgotado } from '@/lib/lc/cupo'
@@ -14,7 +14,7 @@ const MAX_BYTES = 4 * 1024 * 1024
 export async function GET(req: NextRequest) {
   if (!isAuthed(req)) return unauthorized()
   try {
-    const rows = must(await db().from('lc_contratos').select('id,nombre,partes,archivo_nombre,score,activo,created_at').order('created_at', { ascending: false }).limit(50))
+    const rows = must(await db().from('lc_contratos').select('id,nombre,partes,archivo_nombre,score,activo,created_at').eq('espacio', ESPACIO).order('created_at', { ascending: false }).limit(50))
     return Response.json({ contratos: rows })
   } catch (e) { return fail(e) }
 }

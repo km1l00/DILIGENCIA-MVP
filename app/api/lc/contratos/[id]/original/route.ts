@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { isAuthed, unauthorized, fail } from '@/lib/lc/session'
-import { db, must } from '@/lib/lc/db'
+import { db, must, ESPACIO } from '@/lib/lc/db'
 import { leerArchivo } from '@/lib/lc/storage'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<'/api/lc/contratos
   if (!isAuthed(req)) return unauthorized()
   try {
     const { id } = await ctx.params
-    const c = must(await db().from('lc_contratos').select('archivo_nombre,archivo_path').eq('id', id).single()) as any
+    const c = must(await db().from('lc_contratos').select('archivo_nombre,archivo_path').eq('espacio', ESPACIO).eq('id', id).single()) as any
     if (!c.archivo_path) return Response.json({ error: 'Este contrato no tiene archivo original guardado' }, { status: 404 })
     const blob = await leerArchivo(c.archivo_path)
     if (!blob) return Response.json({ error: 'Archivo no encontrado' }, { status: 404 })

@@ -22,6 +22,11 @@ export function proxy(request: NextRequest) {
 
   if (!GATE) return NextResponse.next()
 
+  // Rutas del MVP anterior (marítimo, con datos de demo): ya no forman parte del producto
+  if (/^\/(dashboard|chat|documents|findings|simulator)(\/|$)/.test(pathname)) {
+    return NextResponse.redirect(new URL(authed ? '/inicio' : '/', request.url))
+  }
+
   // Ya autenticado y en el login -> a la app
   if (authed && isLogin) {
     return NextResponse.redirect(new URL('/inicio', request.url))

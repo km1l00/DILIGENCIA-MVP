@@ -67,3 +67,13 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | K5 | Regresión y consola | verificado-prod | Pestaña limpia: 10 llamadas /api/lc/* en 200, 0 mensajes de consola. Se movieron las funciones a gru1 y las lecturas tienen 25 s + 1 reintento (antes un arranque en frío cortaba /panel a los 12 s) |
 
 Créditos Croma usados: ~103 de 1.500 (saldo informado por Croma: 1.397). Claude: 4 preguntas de chat con Opus 5.5 (< $0,20).
+
+## Sin datos hardcodeados · listo para prueba de cliente desde cero (20/10/2026)
+
+| # | Ítem | Estado | Evidencia |
+|---|------|--------|-----------|
+| H1 | Front sin datos de demo ni respaldo | verificado-prod | Eliminados KPIs, actividad, normas, contrato, manifiesto y respuestas precargadas de `app.html`; ESLint `no-undef` sin errores (prueba de control con variables inyectadas sí falla); `build_demo.py` aborta si reaparecen; error visible si la API falla |
+| H2 | Datos de prueba archivados (no borrados) | verificado-prod | Migración 005: espacio `demo` (2 contratos, 3 manifiestos, 24 chat, 22 eventos, 2 boletines, 2 fichas, 1 proceso); 33 consultas filtran por espacio |
+| H3 | Empresa cliente por bienvenida | verificado-prod | NIT 891.300.238-6 → RUES: INGENIO PROVIDENCIA (Palmira, CIIU 1071, 4 representantes); editado y guardado; menú lateral y panel con el nombre real |
+| H4 | Prueba E2E como cliente | verificado-prod | Contrato PDF (unpdf) 75 s, 7 hallazgos, implementar C2 1.8→2.3, export DOCX; manifiesto 01278713 2.9 → vehículo 2.5; panel 2.4; ficha T.D.M. en espacio del cliente (bug onConflict corregido); boletín (numeración corregida a empezar en 1); chat con perfil del cliente; monitoreo alta y baja |
+| H5 | Espacio del cliente vacío al final | verificado-prod | Datos E2E archivados en `prueba-qa`; recarga: bienvenida, 0·0·0·0, índice "Sin datos", 18 normas |

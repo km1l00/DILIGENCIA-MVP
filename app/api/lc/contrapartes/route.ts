@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { isAuthed, unauthorized, fail } from '@/lib/lc/session'
-import { db, must } from '@/lib/lc/db'
+import { db, must, ESPACIO } from '@/lib/lc/db'
 import { fichaContraparte } from '@/lib/lc/contrapartes'
 import { CromaError, saldoCroma } from '@/lib/lc/croma'
 
@@ -11,7 +11,7 @@ export const maxDuration = 300
 export async function GET(req: NextRequest) {
   if (!isAuthed(req)) return unauthorized()
   try {
-    const rows = must(await db().from('lc_contrapartes').select('*').order('consultado_at', { ascending: false }).limit(50))
+    const rows = must(await db().from('lc_contrapartes').select('*').eq('espacio', ESPACIO).order('consultado_at', { ascending: false }).limit(50))
     return Response.json({ contrapartes: rows, saldo: await saldoCroma() })
   } catch (e) { return fail(e) }
 }

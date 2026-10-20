@@ -126,7 +126,7 @@ export async function fichaContraparte(nitIn: string, refrescar = false) {
     procuraduria: procu.ok ? { tiene_registros: !!procu.v.data?.has_records, estado: procu.v.data?.status, mensaje: procu.v.data?.message, consultado: procu.v.data?.checked_at } : null,
     hallazgos: ev.hallazgos, score: ev.score, consultado_at: new Date().toISOString(),
   }
-  const row = must(await db().from('lc_contrapartes').upsert(fila, { onConflict: 'nit' }).select('*').single()) as any
+  const row = must(await db().from('lc_contrapartes').upsert(fila, { onConflict: 'espacio,nit' }).select('*').single()) as any
   await logEvento('contraparte', `Empresa de transporte verificada: ${nombre || nit}`, `${ev.hallazgos.length} hallazgos · riesgo ${ev.score.toFixed(1)}/5`, row.id)
   return { ...row, errores }
 }

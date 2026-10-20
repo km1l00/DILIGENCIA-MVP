@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { isAuthed, unauthorized, fail } from '@/lib/lc/session'
-import { db, must, logEvento } from '@/lib/lc/db'
+import { db, must, logEvento, ESPACIO } from '@/lib/lc/db'
 import { jsonCall, MODEL_FAST } from '@/lib/lc/ai'
 import { ManifiestoDatosSchema, verificarManifiesto } from '@/lib/lc/manifiesto'
 import { guardarArchivo } from '@/lib/lc/storage'
@@ -15,7 +15,7 @@ const MAX_BYTES = 4 * 1024 * 1024
 export async function GET(req: NextRequest) {
   if (!isAuthed(req)) return unauthorized()
   try {
-    const rows = must(await db().from('lc_manifiestos').select('id,numero,archivo_nombre,score,activo,created_at,hallazgos').order('created_at', { ascending: false }).limit(50)) as any[]
+    const rows = must(await db().from('lc_manifiestos').select('id,numero,archivo_nombre,score,activo,created_at,hallazgos').eq('espacio', ESPACIO).order('created_at', { ascending: false }).limit(50)) as any[]
     return Response.json({ manifiestos: rows.map(({ hallazgos, ...r }) => ({ ...r, n_hallazgos: (hallazgos || []).length })) })
   } catch (e) { return fail(e) }
 }
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const v = verificarManifiesto(datos)
     const path = await guardarArchivo('manifiestos', file.name, bytes, 'application/pdf')
     const d = db()
-    must(await d.from('lc_manifiestos').update({ activo: false }).eq('activo', true))
+    must(await d.from('lc_manifiestos').update({ activo: false }).eq('espacio', ESPACIO).eq('activo', true))
     const row = must(await d.from('lc_manifiestos').insert({
       numero: datos.numero, archivo_nombre: file.name, archivo_path: path, datos, campos: v.campos, hallazgos: v.hallazgos, score: v.score, modelo: model, activo: true,
     }).select('*').single()) as any

@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Diligencia | Due Diligence Risk Monitoring',
-  description: 'Plataforma B2B de monitoreo de riesgo para due diligence empresarial en Colombia',
+  title: 'Logicompliance · Legal Intelligence',
+  description: 'Cumplimiento legal y due diligence para generadores de carga en Colombia',
   generator: 'v0.app',
 }
 

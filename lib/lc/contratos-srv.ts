@@ -1,5 +1,5 @@
 // Servicio de contratos: extracción de texto, análisis con Claude, persistencia y vista de detalle.
-import { db, must, logEvento } from './db'
+import { db, must, logEvento, ESPACIO } from './db'
 import { jsonCall, MODEL } from './ai'
 import { ContratoAnalisisSchema, parseClausulas, aplicarHallazgos, repartirImpacto, scoreContrato, limpiarCuerpo, type HallazgoRow } from './contrato'
 
@@ -81,7 +81,7 @@ export async function analizarContrato(nombreArchivo: string, texto: string, arc
   const key = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, '').trim()
 
   const d = db()
-  must(await d.from('lc_contratos').update({ activo: false }).eq('activo', true))
+  must(await d.from('lc_contratos').update({ activo: false }).eq('espacio', ESPACIO).eq('activo', true))
   const row = must(await d.from('lc_contratos').insert({
     nombre: data.nombre, partes: data.partes, fecha: data.fecha, archivo_nombre: nombreArchivo, archivo_path: archivoPath,
     texto_original: limpio, encabezado, clausulas, num_clausulas: clausulas.length, score_base: base, score: base,
@@ -108,7 +108,7 @@ export function nitEmpresaTransporte(texto: string): string | null {
 
 export async function detalleContrato(id: string) {
   const d = db()
-  const c = must(await d.from('lc_contratos').select('*').eq('id', id).single()) as any
+  const c = must(await d.from('lc_contratos').select('*').eq('espacio', ESPACIO).eq('id', id).single()) as any
   const hs = must(await d.from('lc_contrato_hallazgos').select('*').eq('contrato_id', id).order('codigo')) as HallazgoRow[]
   hs.sort((a, b) => Number(a.codigo.slice(1)) - Number(b.codigo.slice(1)))
   const originales = c.clausulas as { nombre: string; body: string }[]

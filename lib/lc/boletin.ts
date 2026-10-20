@@ -1,6 +1,6 @@
 // Boletín normativo semanal: Claude redacta a partir de las normas de la BD; los enlaces y códigos salen de la BD, no del modelo.
 import { z } from 'zod'
-import { db, must, logEvento } from './db'
+import { db, must, logEvento, ESPACIO } from './db'
 import { jsonCall, MODEL } from './ai'
 import { PIE_FAA, type Doc, type Bloque } from './export'
 
@@ -51,8 +51,8 @@ Devuelve un item por cada norma de la lista, con su código exacto.`,
   }
   const hoy = new Date(Date.now() - 5 * 3_600_000)
   const periodo = `${MESES[hoy.getUTCMonth()]} ${hoy.getUTCFullYear()}`
-  const ult = must(await d.from('lc_boletines').select('numero').order('numero', { ascending: false }).limit(1)) as any[]
-  const numero = (ult[0]?.numero ?? 28) + 1
+  const ult = must(await d.from('lc_boletines').select('numero').eq('espacio', ESPACIO).order('numero', { ascending: false }).limit(1)) as any[]
+  const numero = (ult[0]?.numero ?? 0) + 1
   const contenido: BoletinContenido = { intro: data.intro, periodo, secciones: [...secciones.values()] }
   const row = must(await d.from('lc_boletines').insert({ numero, periodo, contenido, modelo: model }).select('*').single()) as any
   await logEvento('boletin', `Boletín normativo N.º ${numero} generado`, `${data.items.length} normas · ${periodo.toLowerCase()}`, row.id)

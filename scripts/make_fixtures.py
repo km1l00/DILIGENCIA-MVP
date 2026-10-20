@@ -3,18 +3,15 @@
 #  - fixtures/manifiesto-01278713.pdf                            (datos del objeto manifiesto del demo; lo que el demo no trae queda vacío)
 #  - fixtures/manifiesto-prueba-ficticio.pdf                     (datos FICTICIOS rotulados como tales, para probar las reglas de 8 h, 5 días hábiles, SICE-TAC y valor en letras)
 # Uso: python scripts/make_fixtures.py
-import json, pathlib, subprocess
+import json, pathlib
 import fitz, docx
 from docx.shared import Pt
 
 root = pathlib.Path(__file__).resolve().parent.parent
 out = root / 'fixtures'
 out.mkdir(exist_ok=True)
-html = (root / 'app.html').read_text(encoding='utf-8')
-js = html[html.index('/* ===== DATOS DEMO'):html.index('/* ===== Sidebar + router')]
-res = subprocess.run(['node', '-e', js + '\nprocess.stdout.write(JSON.stringify({contratoTexto,manifiesto}))'],
-                     capture_output=True, text=True, encoding='utf-8', check=True)
-data = json.loads(res.stdout)
+# Datos de los documentos de prueba (antes vivían en app.html; ya no hay datos de demo en el front)
+data = json.loads((out / 'fuente.json').read_text(encoding='utf-8'))
 texto = data['contratoTexto']
 m = data['manifiesto']
 

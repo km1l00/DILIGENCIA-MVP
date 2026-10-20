@@ -3,6 +3,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 let _db: SupabaseClient | null = null
 
+// Espacio de trabajo del cliente. Los datos de prueba anteriores están archivados en 'demo' (migración 005).
+// Las inserciones toman este valor por defecto en la BD; lecturas y cambios masivos filtran por él.
+export const ESPACIO = 'principal'
+
 export function db(): SupabaseClient {
   if (!_db) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL

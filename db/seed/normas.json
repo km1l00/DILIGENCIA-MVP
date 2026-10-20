@@ -1,0 +1,174 @@
+[
+ {
+  "id": "Decreto 1079 de 2015",
+  "entidad": "Presidencia de la República",
+  "tipo": "Decreto",
+  "estado": "vigente",
+  "fecha": "26/05/2015",
+  "vigencia": "Vigente (marco base)",
+  "cat": "Marco general",
+  "tema": "Decreto Único Reglamentario del Sector Transporte",
+  "titulo": "Decreto Único Reglamentario del Sector Transporte",
+  "resumen": "Compila la reglamentación del sector transporte. Contiene los datos mínimos del manifiesto de carga (art. 2.2.1.7.5.4) y la regla de pago del cargue y descargue (art. 2.2.1.7.6.9).",
+  "puntos": [
+   "Define el contenido mínimo del manifiesto electrónico de carga (art. 2.2.1.7.5.4).",
+   "Establece que el cargue y descargue lo asume el remitente y/o destinatario (art. 2.2.1.7.6.9).",
+   "Es el marco reglamentario contra el cual se verifican manifiestos y contratos."
+  ],
+  "impacto": "Es la norma de referencia para el análisis de sus manifiestos y contratos de transporte.",
+  "url": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=77889"
+ },
+ {
+  "id": "Ley 336 de 1996",
+  "entidad": "Congreso de la República",
+  "tipo": "Ley",
+  "estado": "vigente",
+  "fecha": "20/12/1996",
+  "vigencia": "Vigente (marco legal)",
+  "cat": "Marco general",
+  "tema": "Estatuto Nacional de Transporte",
+  "titulo": "Estatuto Nacional de Transporte",
+  "resumen": "Adopta el Estatuto Nacional de Transporte y fija los principios y criterios del servicio público de transporte, con la seguridad como prioridad esencial.",
+  "puntos": [
+   "Principios del servicio público de transporte.",
+   "La seguridad, y en especial la protección del usuario, como prioridad esencial.",
+   "Régimen sancionatorio del sector transporte."
+  ],
+  "impacto": "Marco legal superior del sector; sustenta las obligaciones y sanciones aplicables.",
+  "url": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=346"
+ },
+ {
+  "id": "Resolución 40595 de 2022",
+  "entidad": "Ministerio de Transporte",
+  "tipo": "Resolución",
+  "estado": "vigente",
+  "fecha": "12/07/2022",
+  "vigencia": "Vigente",
+  "cat": "Seguridad vial",
+  "tema": "Plan Estratégico de Seguridad Vial (PESV)",
+  "titulo": "Metodología de diseño e implementación del Plan Estratégico de Seguridad Vial (PESV)",
+  "resumen": "Define y adopta la metodología para el diseño, implementación y verificación del PESV, bajo el ciclo PHVA, y deroga la Resolución 1565 de 2014.",
+  "puntos": [
+   "Aplica a organizaciones con flota superior a 10 vehículos o que administren conductores.",
+   "Tres niveles de diseño: básico, estándar y avanzado.",
+   "Se articula con el Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST)."
+  ],
+  "impacto": "Revise y actualice su PESV y su evidencia documental antes de una verificación.",
+  "url": "https://normograma.mincultura.gov.co/mincultura/compilacion/docs/resolucion_mintransporte_40595_2022.htm"
+ },
+ {
+  "id": "Resolución DIAN 000165 de 2023",
+  "entidad": "DIAN",
+  "tipo": "Resolución",
+  "estado": "vigente",
+  "fecha": "01/11/2023",
+  "vigencia": "Vigente",
+  "cat": "Tributario y facturación",
+  "tema": "Facturación electrónica y documento equivalente",
+  "titulo": "Sistema de facturación electrónica y documento equivalente electrónico",
+  "resumen": "Regula la generación, transmisión, validación, expedición y recepción de la factura electrónica y del documento equivalente electrónico; deroga la Resolución 000042 de 2020.",
+  "puntos": [
+   "Adopta el documento equivalente electrónico.",
+   "Actualiza el anexo técnico de la factura electrónica.",
+   "Obligatoriedad de facturar electrónicamente para los responsables."
+  ],
+  "impacto": "Alinee su facturación electrónica con los datos del manifiesto y la remesa para evitar rechazos y glosas.",
+  "url": "https://normograma.dian.gov.co/dian/compilacion/docs/resolucion_dian_0165_2023.htm"
+ },
+ {
+  "id": "Actualización del SICE-TAC (Mintransporte, 2025)",
+  "entidad": "Ministerio de Transporte",
+  "tipo": "Resolución",
+  "estado": "actualizada",
+  "fecha": "26/05/2025",
+  "vigencia": "Vigente",
+  "cat": "Fletes y SICE-TAC",
+  "tema": "Actualización del SICE-TAC",
+  "titulo": "Actualización del SICE-TAC: carga liviana y pago mínimo garantizado",
+  "resumen": "Actualiza el Sistema de Información de Costos Eficientes para el Transporte Automotor de Carga (SICE-TAC), con costos más acordes con la realidad, inclusión de la carga liviana y garantía de pago mínimo a la empresa de transporte.",
+  "puntos": [
+   "Incorpora la carga liviana (3.500 a 7.500 kg) al SICE-TAC.",
+   "Actualiza las variables de costo de operación.",
+   "El valor calculado por el SICE-TAC es el pago mínimo de obligatorio cumplimiento."
+  ],
+  "impacto": "Verifique que el flete pactado no sea inferior al valor calculado por el SICE-TAC.",
+  "url": "https://mintransporte.gov.co/publicaciones/12356/mintransporte-actualiza-el-sice-tac-costos-mas-acordes-con-la-realidad-inclusion-de-transporte-de-carga-liviana-y-garantia-de-pago-minimo-para-transportadores/"
+ },
+ {
+  "id": "Instrucciones SICETAC (Supertransporte, 2024)",
+  "entidad": "Superintendencia de Transporte",
+  "tipo": "Circular",
+  "estado": "nueva",
+  "fecha": "2024",
+  "vigencia": "Vigente",
+  "cat": "Fletes y SICE-TAC",
+  "tema": "Supervisión del cumplimiento del SICETAC",
+  "titulo": "Instrucciones a generadores y empresas de carga sobre el cumplimiento del SICETAC",
+  "resumen": "La Superintendencia de Transporte imparte instrucciones a generadores y empresas de carga sobre el cumplimiento del SICETAC y los criterios de supervisión aplicables.",
+  "puntos": [
+   "Instrucciones sobre el reporte y cumplimiento del SICE-TAC.",
+   "Criterios de focalización de la vigilancia.",
+   "Advertencias sobre el pago por debajo del piso tarifario."
+  ],
+  "impacto": "Prepare la trazabilidad de sus reportes y del pago mínimo para una eventual visita de la Superintendencia.",
+  "url": "https://www.supertransporte.gov.co/index.php/comunicaciones-2024/supertransporte-imparte-instrucciones-a-generadores-y-empresas-de-carga-sobre-el-cumplimiento-del-sicetac/"
+ },
+ {
+  "id": "Decreto 1017 de 2025",
+  "entidad": "Ministerio de Transporte",
+  "tipo": "Decreto",
+  "estado": "nueva",
+  "fecha": "21/09/2025",
+  "vigencia": "Vigente",
+  "cat": "Fletes y SICE-TAC",
+  "tema": "Modernización de las reglas del transporte de carga",
+  "titulo": "Modernización de las reglas del transporte de carga (fletes, cargue y descargue)",
+  "resumen": "Modifica el Capítulo 7 del Decreto 1079 de 2015. Reafirma que el flete no puede ser inferior al SICE-TAC y fija reglas y penalidades para los tiempos de cargue y descargue.",
+  "puntos": [
+   "El valor a pagar no puede ser inferior a los costos eficientes del SICE-TAC.",
+   "Fija un límite de 8 horas para el cargue y descargue contadas desde la cita.",
+   "Penalidad de 3 SMLDV por hora adicional en vehículos articulados y 2 SMLDV en rígidos.",
+   "Modifica el artículo 2.2.1.7.3 del Decreto 1079 de 2015."
+  ],
+  "impacto": "Ajuste sus contratos y su control de tiempos de cargue y descargue a los nuevos límites y penalidades.",
+  "url": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=264276"
+ },
+ {
+  "id": "Resolución 20263040016075 de 2026",
+  "entidad": "Ministerio de Transporte",
+  "tipo": "Resolución",
+  "estado": "nueva",
+  "fecha": "29/04/2026",
+  "vigencia": "Vigente",
+  "cat": "Manifiesto y RNDC",
+  "tema": "RNDC y manifiesto electrónico de carga",
+  "titulo": "Unificación y compilación de la reglamentación del RNDC",
+  "resumen": "Unifica y compila la reglamentación del Registro Nacional de Despachos de Carga (RNDC) y del manifiesto electrónico de carga.",
+  "puntos": [
+   "El manifiesto electrónico se genera con mérito ejecutivo.",
+   "No se expide el manifiesto por valores inferiores a los costos del SICE-TAC.",
+   "Registro de tiempos logísticos mediante uso de tecnología."
+  ],
+  "impacto": "Valide el diligenciamiento completo del manifiesto en el RNDC, en especial los tiempos de cargue y descargue.",
+  "url": "https://plc.mintransporte.gov.co/Portals/0/Manuales/MANUAL%20RNDC%202026.pdf"
+ },
+ {
+  "id": "Actualización de peajes 2026 (INVIAS)",
+  "entidad": "INVIAS",
+  "tipo": "Resolución",
+  "estado": "actualizada",
+  "fecha": "15/01/2026",
+  "vigencia": "Vigente desde enero de 2026",
+  "cat": "Infraestructura y peajes",
+  "tema": "Reajuste de tarifas de peaje 2026",
+  "titulo": "Actualización de las tarifas de peaje para 2026",
+  "resumen": "INVIAS ajusta las tarifas de peaje de sus estaciones para 2026 con un incremento del 5,10% correspondiente a la variación del IPC de 2025.",
+  "puntos": [
+   "Ajuste del 5,10% (IPC 2025).",
+   "Aplica a 38 estaciones de peaje en 16 departamentos.",
+   "Vigencia a partir de enero de 2026."
+  ],
+  "impacto": "Actualice la estructura de costos de sus rutas y la negociación de fletes con el reajuste de peajes.",
+  "url": "https://www.invias.gov.co/publicaciones/9378/invias-actualiza-tarifas-de-las-estaciones-de-peaje-para-el-ano-2026/"
+ }
+]

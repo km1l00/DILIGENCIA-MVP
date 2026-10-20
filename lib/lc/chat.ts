@@ -1,7 +1,8 @@
 // Asistente legal: contexto desde la BD (normas, contrato y manifiesto activos) y system prompt de F&AA.
-import { db, must } from './db'
+import { db, must, ESPACIO } from './db'
 import { detalleContrato } from './contratos-srv'
 import { contratoActivo, manifiestoActivo } from './estado'
+import { obtenerEmpresa } from './empresa'
 
 export const CONVERSACION = 'principal'
 
@@ -64,10 +65,12 @@ export async function contextoChat(normaCodigo?: string | null): Promise<{ norma
     const n = must(await d.from('lc_normas').select('*').eq('codigo', normaCodigo).maybeSingle()) as any
     if (n) foco = `El usuario pregunta desde la ficha de esta norma; tómala como contexto principal:\n${n.codigo} · ${n.titulo} (${n.entidad}, ${n.fecha || 's. f.'}). ${n.resumen}\nPuntos: ${(n.puntos || []).join(' | ')}\nImpacto: ${n.impacto || ''}\nURL oficial: ${n.url}`
   }
-  return { normas: normasTxt, contrato: contratoTxt, manifiesto: manifTxt, foco }
+  const emp = await obtenerEmpresa()
+  const empresaTxt = emp ? `Cliente (generador de carga): ${emp.razon_social}, NIT ${emp.nit}${emp.dv ? '-' + emp.dv : ''}${emp.actividad ? ' · actividad: ' + emp.actividad : ''}${emp.municipio ? ' · ' + emp.municipio : ''}.` : 'El cliente aún no ha registrado su empresa.'
+  return { normas: normasTxt, contrato: empresaTxt + '\n\n' + contratoTxt, manifiesto: manifTxt, foco }
 }
 
 export async function historial(limit = 16) {
-  const rows = must(await db().from('lc_chat').select('role,content,norma_codigo,created_at').eq('conversacion', CONVERSACION).order('created_at', { ascending: false }).limit(limit)) as any[]
+  const rows = must(await db().from('lc_chat').select('role,content,norma_codigo,created_at').eq('espacio', ESPACIO).eq('conversacion', CONVERSACION).order('created_at', { ascending: false }).limit(limit)) as any[]
   return rows.reverse()
 }

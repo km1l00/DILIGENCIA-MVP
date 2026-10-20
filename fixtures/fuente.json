@@ -1,0 +1,29 @@
+{
+ "contratoTexto": "CONTRATO DE TRANSPORTE TERRESTRE DE CARGA\n\nEntre los suscritos, GRUPO NF S.A.S., identificada con NIT 901.780.925 (en adelante, la \"EMPRESA DE TRANSPORTE\"), e INGENIO PROVIDENCIA S.A., identificada con NIT 891.300.238-6 (en adelante, el \"GENERADOR\"), se celebra el presente contrato de transporte terrestre de carga, que se regirá por las siguientes cláusulas:\n\nPRIMERA. OBJETO. La EMPRESA DE TRANSPORTE se obliga a transportar por vía terrestre la mercancía entregada por el GENERADOR desde el origen hasta el destino acordados en cada remesa, y a entregarla al destinatario en las condiciones en que la recibió.\n\nSEGUNDA. MERCANCÍA. La mercancía objeto de transporte corresponde a azúcar refinada para uso industrial, movilizada en contenedor, cuyas cantidades y características se detallan en la respectiva remesa terrestre de carga.\n\nTERCERA. VALOR Y FORMA DE PAGO. El GENERADOR pagará a la EMPRESA DE TRANSPORTE el valor del flete acordado por viaje, previa presentación de la factura y del cumplido de la entrega. El pago se realizará dentro de los términos pactados en la remesa.\n\nCUARTA. RESPONSABILIDAD. La empresa de transporte responderá por la mercancía transportada conforme a la ley.\n\nQUINTA. CARGUE Y DESCARGUE. Las labores de cargue y descargue serán coordinadas por las partes según la operación.\n\nSEXTA. OBLIGACIONES DE LA EMPRESA DE TRANSPORTE. La EMPRESA DE TRANSPORTE se obliga a: (i) contar con la habilitación y los vehículos idóneos; (ii) expedir el manifiesto electrónico de carga y registrarlo en el RNDC; (iii) cumplir las normas de tránsito y transporte aplicables.\n\nSÉPTIMA. DURACIÓN. El presente contrato tendrá una duración de un (1) año contado a partir de su suscripción, prorrogable por acuerdo entre las partes.\n\nOCTAVA. VIGENCIA. El presente contrato deja sin efecto cualquier acuerdo anterior entre las partes sobre la misma materia.",
+ "manifiesto": {
+  "numero": "01278713",
+  "autorizacion": "102064598",
+  "tipo": "General",
+  "expedicion": "13/05/2025",
+  "empresa": "TDM Transportes S.A.S.",
+  "empresaNit": "890.904.488-1",
+  "origen": "El Cerrito, Valle del Cauca",
+  "destino": "Cartagena (CONTECAR)",
+  "remitente": "Grupo NF S.A.S. · NIT 901.780.925",
+  "destinatario": "Contecar S.A. · NIT 800.116.164-0",
+  "vehiculo": "International · Placa JCR435 · Config. 3S2",
+  "poseedor": "Grupo NF S.A.S.",
+  "conductor": "N. S. S. · C.C. ****3579",
+  "mercancia": "Contenedor 40\" — 19 pallets, sacos de 50 kg de azúcar refinada",
+  "peso": "28.110,5 kg",
+  "seguro": "MAPFRE Seguros · Póliza R42723",
+  "valorTotal": 8200000,
+  "valorLetras": "OCHO MILLONES DOSCIENTOS MIL PESOS",
+  "saldo": 8068000,
+  "ica": 0,
+  "carguePor": "Remitente",
+  "descarguePor": "(sin diligenciar)",
+  "fechaPago": "21/12/2025",
+  "cumplimiento": 3.1
+ }
+}

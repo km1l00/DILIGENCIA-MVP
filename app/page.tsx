@@ -85,7 +85,7 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
-            <p className="text-center text-sm text-white/80">Acceso de demostración · <span className="text-white">franco.admin</span></p>
+            <p className="text-center text-sm text-white/80">Plataforma de cumplimiento legal para generadores de carga</p>
 
             {error && (
               <div style={{ fontSize: 12.5, color: '#ffdada', background: 'rgba(224,82,82,.28)', border: '1px solid rgba(255,150,150,.5)', borderRadius: 10, padding: '8px 12px' }}>
