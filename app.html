@@ -177,6 +177,7 @@
     <section class="view" id="view-normativa"></section>
     <section class="view" id="view-contratos"></section>
     <section class="view" id="view-manifiesto"></section>
+    <section class="view" id="view-contrapartes"></section>
     <section class="view" id="view-chat"></section>
   </div></main>
 </div>
@@ -528,6 +529,7 @@ const navItems=[
  {id:'normativa',label:'Actualización Normativa',icon:'news'},
  {id:'contratos',label:'Revisión de Contratos',icon:'scale'},
  {id:'manifiesto',label:'Análisis de Manifiesto',icon:'truck'},
+ {id:'contrapartes',label:'Contrapartes y Procesos',icon:'building'},
  {id:'chat',label:'Asistente IA',icon:'msg'},
 ];
 function initStatic(){
@@ -580,7 +582,7 @@ function gaugeBlock(score){
 }
 
 /* ===== Dashboard ===== */
-const ACT_STYLE={manifiesto:['truck','#e05252'],norma:['news','#EABC1F'],contrato:['scale','#254B59'],boletin:['news','#C9A018']};
+const ACT_STYLE={manifiesto:['truck','#e05252'],norma:['news','#EABC1F'],contrato:['scale','#254B59'],boletin:['news','#C9A018'],contraparte:['building','#254B59'],proceso:['scale','#7a5c99']};
 function kpisVista(){
  if(!PANEL)return kpis;const k=PANEL.kpis;
  return [{...kpis[0],n:k.normasNuevasSemana},{...kpis[1],n:k.contratos},{...kpis[2],n:k.manifiestos},{...kpis[3],n:k.hallazgosActivos}];
@@ -927,6 +929,7 @@ function renderContratos(){
     <button onclick="contratoMejOpen=!contratoMejOpen;renderContratos()" style="display:flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;color:#2f7d5b;font-size:13px;font-weight:600;padding:0">
      <span style="width:16px;height:16px;display:inline-flex">${I.check2}</span>${contratoMejOpen?'Ocultar contrato mejorado':'Ver contrato con cambios propuestos'}
      <span class="chevron ${contratoMejOpen?'open':''}" style="width:16px;height:16px;display:inline-flex;color:var(--muted)">${I.chevDown}</span></button>
+    ${CT&&CT.contrato.nit_empresa?`<button onclick="verContraparte('${esc(CT.contrato.nit_empresa)}')" style="display:flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;color:#254B59;font-size:13px;font-weight:600;padding:0"><span style="width:16px;height:16px;display:inline-flex;color:#EABC1F">${I.building}</span>Verificar empresa de transporte (NIT ${esc(CT.contrato.nit_empresa)})</button>`:''}
     ${V.original?`<a href="/api/lc/contratos/${CT.contrato.id}/original" style="display:flex;align-items:center;gap:8px;color:#254B59;font-size:13px;font-weight:600;text-decoration:none"><span style="width:16px;height:16px;display:inline-flex;color:#EABC1F">${I.download}</span>Descargar archivo original</a>`:''}
    </div>
    ${contratoDocOpen?`<pre style="margin-top:12px;background:rgba(37,75,89,.04);border:1px solid rgba(37,75,89,.1);border-radius:12px;padding:16px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:#2b4753;max-height:360px;overflow:auto">${esc(V.texto)}</pre>`:''}
@@ -980,7 +983,7 @@ function renderContratos(){
 }
 
 /* ===== Módulo 3: Manifiesto ===== */
-let MANIF=null, MANIF_HIST=[], manifCargando=false, manifArchivo='';
+let MANIF=null, MANIF_HIST=[], manifCargando=false, manifArchivo='', vehCargando=false;
 const pesoKg=v=>new Intl.NumberFormat('es-CO',{maximumFractionDigits:1}).format(v)+' kg';
 function manifVista(){
  if(!MANIF)return {m:manifiesto,campos:manifiestoCampos,errores:manifiestoErrores,score:manifiesto.cumplimiento,archivo:''};
@@ -995,7 +998,7 @@ function manifVista(){
    peso:M.peso_kg!=null?pesoKg(M.peso_kg):(M.volumen||'—'),seguro:[S.aseguradora,S.poliza&&('Póliza '+S.poliza)].filter(Boolean).join(' · ')||'—',
    valorTotal:d.valor_total,valorLetras:d.valor_letras||'',ica:d.retencion_ica,
    carguePor:d.cargue_pagado_por||'(sin diligenciar)',descarguePor:d.descargue_pagado_por||'(sin diligenciar)',fechaPago:d.fecha_pago||'—'},
-  campos:MANIF.campos||[],errores:MANIF.hallazgos||[],score:Number(MANIF.score),archivo:MANIF.archivo_nombre||''};
+  campos:MANIF.campos||[],errores:MANIF.hallazgos||[],score:Number(MANIF.score),archivo:MANIF.archivo_nombre||'',nVeh:((MANIF.verificacion||{}).hallazgos||[]).length};
 }
 async function cargarManifiestos(){
  try{
@@ -1022,6 +1025,15 @@ async function subirManifiesto(file){
  }catch(e){aviso('No se pudo analizar el manifiesto: '+e.message,'error');}
  finally{manifCargando=false;renderManifiesto();}
 }
+async function verificarVehiculoUI(){
+ if(!MANIF){aviso('La verificación del vehículo requiere conexión con el servidor.');return;}
+ vehCargando=true;renderManifiesto();
+ try{const j=await api('/api/lc/manifiestos/'+MANIF.id+'/vehiculo',{method:'POST',timeout:240000});MANIF=j.manifiesto;CROMA_SALDO=j.saldo;
+  const it=MANIF_HIST.find(x=>x.id===MANIF.id);if(it)it.score=MANIF.score;
+  const v=MANIF.verificacion||{};aviso('Vehículo '+v.placa+' verificado: '+(v.hallazgos||[]).length+' hallazgos.','ok');cargarPanel();}
+ catch(e){aviso('No se pudo verificar el vehículo: '+e.message,'error');}
+ finally{vehCargando=false;renderManifiesto();}
+}
 async function verManifiesto(id){
  try{const j=await api('/api/lc/manifiestos/'+id+'/activar',{method:'POST'});MANIF=j.manifiesto;
   MANIF_HIST.forEach(x=>x.activo=x.id===id);renderManifiesto();cargarPanel();window.scrollTo({top:0,behavior:'smooth'});}
@@ -1038,6 +1050,11 @@ function renderManifiesto(){
    <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${manifCargando?';opacity:.7':''}" ${manifCargando?'disabled':''} onclick="elegirManifiesto()">${I.upload}${MANIF?'Cargar otro manifiesto':'Cargar manifiesto'}</button>
   </div>
   ${manifCargando?loaderCard('Analizando '+esc(manifArchivo)+'…','Extrayendo datos con IA · verificando los 13 campos del art. 2.2.1.7.5.4 · reglas de pago, tiempos y SICE-TAC'):''}
+  ${MANIF?`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+   <button class="glass-btn-ghost" style="padding:9px 14px;display:inline-flex;align-items:center;gap:6px${vehCargando?';opacity:.7':''}" ${vehCargando?'disabled':''} onclick="verificarVehiculoUI()">${vehCargando?`<span class="spin" style="width:14px;height:14px;display:inline-flex">${I.compass}</span>Consultando RUNT y SIMIT...`:`${I.truck}${MANIF.verificacion?'Actualizar verificación del vehículo':'Verificar vehículo en RUNT y SIMIT'}`}</button>
+   ${MANIF.datos&&MANIF.datos.empresa&&MANIF.datos.empresa.nit?`<button class="glass-btn-ghost" style="padding:9px 14px;display:inline-flex;align-items:center;gap:6px" onclick="verContraparte('${esc(MANIF.datos.empresa.nit)}')">${I.building}Verificar empresa de transporte (NIT ${esc(MANIF.datos.empresa.nit)})</button>`:''}
+  </div>`:''}
+  ${vehCargando?loaderCard('Consultando RUNT y SIMIT…','Historial del vehículo, SOAT y revisión técnico-mecánica a la fecha del manifiesto · comparendos pendientes'):''}
   <div class="glass-score" style="padding:24px;margin-top:20px">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:16px">
@@ -1049,7 +1066,7 @@ function renderManifiesto(){
     <div style="text-align:center">
      <p style="font-size:12px;color:var(--muted)">Cumplimiento</p>
      <div style="font-size:38px;font-weight:700;font-family:monospace;color:${scoreColor(Vm.score)}">${Vm.score.toFixed(1)}</div>
-     <span class="badge-pill" style="background:${scoreColor(Vm.score)}18;border:1px solid ${scoreColor(Vm.score)}4D;color:${scoreColor(Vm.score)}">${okCount}/13 campos · ${Vm.errores.length} hallazgos</span>
+     <span class="badge-pill" style="background:${scoreColor(Vm.score)}18;border:1px solid ${scoreColor(Vm.score)}4D;color:${scoreColor(Vm.score)}">${okCount}/13 campos · ${Vm.errores.length+(Vm.nVeh||0)} hallazgos</span>
     </div>
    </div>
   </div>
@@ -1094,6 +1111,27 @@ function renderManifiesto(){
      </div>
     </div>`).join('')}
   </div>
+  ${MANIF&&MANIF.verificacion?(()=>{const v=MANIF.verificacion,ru=v.runt,si=v.simit;const kv=(k,x)=>`<div class="kv"><span class="k">${k}</span><span class="v">${x}</span></div>`;return `
+  <h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Verificación del vehículo ${esc(v.placa)} (RUNT y SIMIT)</h2>
+  <div class="glass" style="padding:18px">
+   <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Vigencias evaluadas a ${v.fecha_referencia?'la fecha de expedición del manifiesto ('+esc(v.fecha_referencia)+')':'la fecha de consulta'} · consultado ${hace(v.consultado_at)}</p>
+   ${ru?`<div style="display:grid;gap:14px;grid-template-columns:repeat(4,1fr)" class="grid-kpi">
+    ${kv('Clase',esc(ru.clase||'—'))}${kv('Servicio',esc(ru.servicio||'—'))}${kv('Estado RUNT',esc(ru.estado||'—'))}${kv('Marca y modelo',esc([ru.marca,ru.modelo].filter(Boolean).join(' ')||'—'))}
+    ${kv('SOAT en la fecha',ru.soat_en_fecha?'<span style="color:#2f7d5b">Vigente</span>':'<span style="color:#e05252">No vigente</span>')}${kv('Revisión técnico-mecánica',ru.rtm_exento?'Exento (vehículo nuevo)':ru.rtm_en_fecha?'<span style="color:#2f7d5b">Vigente</span>':'<span style="color:#e05252">No vigente</span>')}
+    ${kv('SIMIT',si?(si.al_dia?'<span style="color:#2f7d5b">Al día</span>':`${si.comparendos} pendientes · ${COP(si.valor_pendiente||0)}`):'—')}${kv('Matrícula',esc(fechaCorta(ru.matricula)))}
+   </div>`:'<p style="font-size:13px;color:var(--muted)">RUNT no disponible.</p>'}
+   ${(v.errores||[]).length?`<p style="font-size:12px;color:#b5652a;margin-top:10px">${esc(v.errores.join(' · '))}</p>`:''}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">${(v.hallazgos||[]).map(e=>`<div class="glass-finding" style="padding:16px;border-left:4px solid ${riskColor(e.risk)}">
+     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span class="badge-pill" style="background:${riskBg(e.risk)};color:${riskColor(e.risk)};border:1px solid ${riskColor(e.risk)}55">Riesgo ${e.risk[0].toUpperCase()+e.risk.slice(1)}</span>
+      ${e.url?`<a class="badge-pill" href="${esc(e.url)}" target="_blank" rel="noopener" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px;text-decoration:underline;text-underline-offset:2px">${esc(e.base)}</a>`:`<span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${esc(e.base)}</span>`}</div>
+     <h3 style="font-size:14px;font-weight:600">${esc(e.t)}</h3>
+     <p style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6">${esc(e.detalle)}</p>
+     <div style="display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-top:12px" class="grid-diff">
+      <div class="diff-col diff-old"><p style="font-size:11px;font-weight:700;color:#e05252;margin-bottom:4px">REGISTRO OFICIAL</p>${esc(e.actual)}</div>
+      <div class="diff-col diff-new"><p style="font-size:11px;font-weight:700;color:#2ecc71;margin-bottom:4px">ACCIÓN SUGERIDA</p>${esc(e.sugerido)}</div>
+     </div></div>`).join('')||'<div class="glass" style="padding:16px;font-size:13px;color:var(--muted)">Sin hallazgos frente a RUNT y SIMIT.</div>'}</div>`;})():''}
   ${MANIF_HIST.length?`<h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Historial de manifiestos</h2>
   <div class="glass" style="padding:8px 16px">${MANIF_HIST.map(h=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(37,75,89,.06)">
     <span style="width:18px;height:18px;display:inline-flex;color:${h.activo?'#EABC1F':'var(--muted)'}">${I.file}</span>
@@ -1111,9 +1149,139 @@ function renderManifiesto(){
   </div>`;
 }
 
+/* ===== Módulo: Contrapartes y Procesos (registros oficiales vía Croma) ===== */
+let CP_LIST=[], CP_SEL=null, CROMA_SALDO=null, cpCargando=false, cpError='';
+let PROC_LIST=[], procCargando=false, procRevisando=false, procAbierto=null;
+const fechaCorta=s=>s?String(s).slice(0,10):'—';
+function saldoTxt(){if(!CROMA_SALDO)return '';const r=CROMA_SALDO.restantes;return `Créditos Croma: ${r==null?'—':r.toLocaleString('es-CO')} disponibles · ${CROMA_SALDO.hoy}/${CROMA_SALDO.tope} usados hoy`;}
+async function cargarContrapartes(){
+ try{const j=await api('/api/lc/contrapartes');CP_LIST=j.contrapartes;CROMA_SALDO=j.saldo;if(!CP_SEL&&CP_LIST.length)CP_SEL=CP_LIST[0];renderContrapartes();}
+ catch(e){respaldo(e);}
+}
+async function cargarProcesos(){
+ try{const j=await api('/api/lc/procesos');PROC_LIST=j.procesos;CROMA_SALDO=j.saldo;renderContrapartes();}catch(e){}
+}
+async function verificarContraparte(nit,refrescar){
+ nit=String(nit||'').trim();if(!nit){aviso('Indique el NIT de la empresa de transporte.','error');return;}
+ if(!normasDesdeBD){aviso('La verificación en registros oficiales requiere conexión con el servidor.');return;}
+ cpCargando=true;cpError='';renderContrapartes();
+ try{const j=await api('/api/lc/contrapartes',{method:'POST',body:{nit,refrescar:!!refrescar},timeout:200000});
+  CP_SEL=j.contraparte;CROMA_SALDO=j.saldo;CP_LIST=[CP_SEL,...CP_LIST.filter(x=>x.nit!==CP_SEL.nit)];
+  aviso((CP_SEL.nombre||CP_SEL.nit)+': '+CP_SEL.hallazgos.length+' hallazgos · riesgo '+Number(CP_SEL.score).toFixed(1)+'/5.','ok');cargarPanel();}
+ catch(e){cpError=e.message;aviso('No se pudo verificar la empresa: '+e.message,'error');}
+ finally{cpCargando=false;renderContrapartes();}
+}
+function verContraparte(nit){
+ const base=String(nit||'').replace(/-\s*\d$/,'').replace(/\D/g,'');
+ go('contrapartes');const ya=CP_LIST.find(x=>x.nit===base);
+ if(ya){CP_SEL=ya;renderContrapartes();window.scrollTo({top:0,behavior:'smooth'});}
+ else verificarContraparte(nit);
+}
+async function agregarProcesoUI(){
+ const rad=(document.getElementById('procRad')||{}).value||'',alias=(document.getElementById('procAlias')||{}).value||'';
+ if(!rad.trim()){aviso('Indique el número de radicado.','error');return;}
+ procCargando=true;renderContrapartes();
+ try{const j=await api('/api/lc/procesos',{method:'POST',body:{radicado:rad,alias},timeout:120000});CROMA_SALDO=j.saldo;
+  PROC_LIST=[j.proceso,...PROC_LIST.filter(x=>x.id!==j.proceso.id)];aviso(j.proceso.encontrado?'Proceso agregado al monitoreo.':'Radicado agregado, pero la Rama Judicial no devolvió un proceso público.','ok');cargarPanel();}
+ catch(e){aviso('No se pudo agregar el proceso: '+e.message,'error');}
+ finally{procCargando=false;renderContrapartes();}
+}
+async function revisarProcesosUI(){
+ if(!PROC_LIST.length)return;procRevisando=true;renderContrapartes();
+ try{const j=await api('/api/lc/procesos/revisar',{method:'POST',timeout:290000});PROC_LIST=j.procesos;CROMA_SALDO=j.saldo;
+  aviso(`${j.revisados} procesos revisados · ${j.nuevas} actuaciones nuevas`+(j.errores.length?` · ${j.errores.length} con error`:''),'ok');cargarPanel();}
+ catch(e){aviso('No se pudo revisar: '+e.message,'error');}
+ finally{procRevisando=false;renderContrapartes();}
+}
+async function accionProceso(id,accion){
+ try{await api('/api/lc/procesos/'+id,{method:'POST',body:{accion}});
+  if(accion==='desactivar'){PROC_LIST=PROC_LIST.filter(x=>x.id!==id);aviso('El proceso dejó de monitorearse.','ok');}
+  else{const p=PROC_LIST.find(x=>x.id===id);if(p)p.nuevas=0;}
+  renderContrapartes();}catch(e){aviso('No se pudo completar: '+e.message,'error');}
+}
+function toggleProceso(id){procAbierto=procAbierto===id?null:id;const p=PROC_LIST.find(x=>x.id===id);if(procAbierto&&p&&p.nuevas)accionProceso(id,'vistas');else renderContrapartes();}
+function hallazgoCard(e){return `<div class="glass-finding" style="padding:14px 16px;border-left:4px solid ${riskColor(e.risk)}">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+   <span class="badge-pill" style="background:${riskBg(e.risk)};color:${riskColor(e.risk)};border:1px solid ${riskColor(e.risk)}55">Riesgo ${e.risk[0].toUpperCase()+e.risk.slice(1)}</span>
+   ${e.url?`<a class="badge-pill" href="${esc(e.url)}" target="_blank" rel="noopener" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px;text-decoration:underline;text-underline-offset:2px">${esc(e.base)}</a>`:`<span class="badge-pill" style="background:rgba(37,75,89,.05);color:var(--navy-medium);font-size:11px">${esc(e.base)}</span>`}</div>
+  <h3 style="font-size:14px;font-weight:600">${esc(e.t)}</h3>
+  <p style="font-size:13px;color:var(--muted);margin-top:4px;line-height:1.6">${esc(e.detalle)}</p></div>`;}
+function renderContrapartes(){
+ const el=document.getElementById('view-contrapartes');if(!el)return;
+ const f=CP_SEL,r=f&&f.rues;
+ const kv=(k,v)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+ el.innerHTML=`
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+   <div><h1 class="page">Contrapartes y Procesos</h1><p class="sub">Due diligence de empresas de transporte y monitoreo judicial en registros oficiales</p></div>
+   ${CROMA_SALDO?`<div class="glass-sm" style="padding:8px 14px;font-size:12px;color:var(--muted)">${esc(saldoTxt())}</div>`:''}
+  </div>
+  <div class="glass" style="padding:18px;margin-top:20px">
+   <h2 style="font-size:15px;font-weight:600;margin-bottom:4px">Verificar empresa de transporte</h2>
+   <p style="font-size:12px;color:var(--muted);margin-bottom:12px">RUES (matrícula y renovación) · Rama Judicial (procesos activos) · SECOP (sanciones) · Procuraduría (antecedentes)</p>
+   <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <input id="cpNit" placeholder="NIT, p. ej. 901.780.925" class="sel" style="flex:1;min-width:200px;padding:10px 12px;font-size:14px" onkeydown="if(event.key==='Enter')verificarContraparte(this.value)">
+    <button class="glass-btn-primary" style="padding:10px 16px;display:inline-flex;align-items:center;gap:8px${cpCargando?';opacity:.7':''}" ${cpCargando?'disabled':''} onclick="verificarContraparte(document.getElementById('cpNit').value)">${I.shield}Verificar</button>
+   </div>
+   ${CP_LIST.length>1?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${CP_LIST.slice(0,8).map(x=>`<button class="glass-pill" style="${f&&f.nit===x.nit?'border-color:#EABC1F;background:rgba(234,188,31,.12)':''}" onclick="CP_SEL=CP_LIST.find(c=>c.nit==='${x.nit}');renderContrapartes()">${esc((x.nombre||x.nit).slice(0,34))} · ${Number(x.score).toFixed(1)}</button>`).join('')}</div>`:''}
+  </div>
+  ${cpCargando?loaderCard('Consultando registros oficiales…','RUES · Rama Judicial · SECOP · Procuraduría (puede tardar hasta un minuto)'):''}
+  ${f?`<div class="glass-score" style="padding:24px;margin-top:20px">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:16px">
+     <div style="display:flex;height:52px;width:52px;align-items:center;justify-content:center;border-radius:14px;background:rgba(37,75,89,.08);color:#254B59">${I.building}</div>
+     <div><h2 style="font-size:16px;font-weight:700">${esc(f.nombre||'Sin registro en el RUES')}</h2>
+      <p class="sub" style="font-size:13px">NIT ${esc(r&&r.nit?r.nit+(r.dv?'-'+r.dv:''):f.nit)}${r&&r.camara?' · '+esc(r.camara):''}</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px">Consultado ${hace(f.consultado_at)} · <a style="cursor:pointer;text-decoration:underline" onclick="verificarContraparte('${f.nit}',true)">actualizar</a></p></div>
+    </div>
+    <div style="text-align:center"><p style="font-size:12px;color:var(--muted)">Riesgo de la contraparte</p>
+     <div style="font-size:38px;font-weight:700;font-variant-numeric:tabular-nums;color:${scoreColorInst(Number(f.score))}">${Number(f.score).toFixed(1)}</div>
+     <span class="badge-pill" style="background:${scoreColorInst(Number(f.score))}18;border:1px solid ${scoreColorInst(Number(f.score))}55;color:${scoreColorInst(Number(f.score))}">${f.hallazgos.length} hallazgos</span></div>
+   </div>
+   ${r?`<div style="display:grid;gap:14px;grid-template-columns:repeat(3,1fr);margin-top:18px" class="grid-manif">
+     ${kv('Estado de la matrícula',esc(r.estado||'—'))}${kv('Último año renovado',esc(r.anio_renovado||'—'))}${kv('Fecha de matrícula',esc(fechaCorta(r.fecha_matricula)))}
+     ${kv('Actividad principal',esc((r.ciiu?r.ciiu+' · ':'')+(r.actividad||'—')))}${kv('Municipio',esc(r.municipio||'—'))}${kv('Representación legal',esc((r.representantes||[]).map(x=>x.nombre).join(', ')||'—'))}
+    </div>`:''}
+   ${f.errores&&f.errores.length?`<p style="font-size:12px;color:#b5652a;margin-top:12px">Fuentes no disponibles en esta consulta: ${esc(f.errores.join(' · '))}</p>`:''}
+  </div>
+  <h2 style="font-size:16px;font-weight:600;margin:24px 0 12px">Hallazgos</h2>
+  <div style="display:flex;flex-direction:column;gap:12px">${f.hallazgos.length?f.hallazgos.map(hallazgoCard).join(''):`<div class="glass" style="padding:18px;font-size:13px;color:var(--muted)">Sin hallazgos en las fuentes consultadas.</div>`}</div>
+  <div style="display:grid;gap:20px;grid-template-columns:1fr 1fr;margin-top:20px" class="grid-manif">
+   <div class="glass" style="padding:18px"><h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Procesos activos (coincidencia por razón social)</h3>
+    ${f.procesos?(f.procesos.coincidencias.length?f.procesos.coincidencias.slice(0,8).map(c=>`<div style="padding:7px 0;border-bottom:1px solid rgba(37,75,89,.06);font-size:12.5px"><span style="font-family:ui-monospace,monospace">${esc(c.registration_number)}</span><span style="display:block;color:var(--muted)">${esc(c.court||'')} · última actuación ${esc(fechaCorta(c.last_action_date))}</span></div>`).join(''):`<p style="font-size:12.5px;color:var(--muted)">Sin procesos activos que coincidan con la razón social (${f.procesos.total_busqueda} resultados revisados).</p>`):'<p style="font-size:12.5px;color:var(--muted)">No disponible.</p>'}</div>
+   <div class="glass" style="padding:18px"><h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Sanciones SECOP y Procuraduría</h3>
+    ${f.sanciones?(f.sanciones.resultados.length?f.sanciones.resultados.slice(0,5).map(s=>`<div style="padding:7px 0;border-bottom:1px solid rgba(37,75,89,.06);font-size:12.5px">${esc(s.entity)} · resolución ${esc(s.resolution_number||'s. n.')}<span style="display:block;color:var(--muted)">${esc(fechaCorta(s.final_date||s.published_date))}${s.value?' · '+COP(s.value):''}</span></div>`).join(''):'<p style="font-size:12.5px;color:var(--muted)">Sin sanciones como contratista en SECOP.</p>'):'<p style="font-size:12.5px;color:var(--muted)">SECOP no disponible.</p>'}
+    <p style="font-size:12.5px;margin-top:10px">${f.procuraduria?(f.procuraduria.tiene_registros?'<strong style="color:#e05252">Procuraduría: registra antecedentes.</strong>':'Procuraduría: sin antecedentes registrados.'):'Procuraduría: no disponible.'}</p></div>
+  </div>`:(cpError?'':`<div class="glass" style="padding:20px;margin-top:16px;font-size:13px;color:var(--muted)">Ingrese el NIT de una empresa de transporte o use "Verificar empresa de transporte" desde un contrato o un manifiesto.</div>`)}
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px">
+   <h2 style="font-size:16px;font-weight:600">Procesos judiciales monitoreados</h2>
+   <button class="glass-btn-ghost" style="padding:8px 14px;display:inline-flex;align-items:center;gap:6px${procRevisando||!PROC_LIST.length?';opacity:.6':''}" ${procRevisando||!PROC_LIST.length?'disabled':''} onclick="revisarProcesosUI()">${procRevisando?`<span class="spin" style="width:14px;height:14px;display:inline-flex">${I.compass}</span>Revisando...`:`${I.bell}Revisar ahora`}</button>
+  </div>
+  <div class="glass" style="padding:16px">
+   <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Revisión automática diaria en la Rama Judicial. Cada actuación nueva aparece en la actividad reciente del panel.</p>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+    <input id="procRad" placeholder="Radicado (20 a 25 dígitos)" class="sel" style="flex:2;min-width:220px;padding:9px 12px;font-size:13.5px;font-family:ui-monospace,monospace">
+    <input id="procAlias" placeholder="Referencia (opcional), p. ej. Ejecutivo contra Grupo NF" class="sel" style="flex:2;min-width:200px;padding:9px 12px;font-size:13.5px">
+    <button class="glass-btn-primary" style="padding:9px 14px${procCargando?';opacity:.7':''}" ${procCargando?'disabled':''} onclick="agregarProcesoUI()">${procCargando?'Agregando...':'Monitorear'}</button>
+   </div>
+   ${PROC_LIST.length?PROC_LIST.map(p=>{const c=p.caso||{};const ab=procAbierto===p.id;return `<div style="border-top:1px solid rgba(37,75,89,.08);padding:10px 0">
+     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px;cursor:pointer" onclick="toggleProceso('${p.id}')">
+       <p style="font-size:13px;font-weight:600"><span style="font-family:ui-monospace,monospace">${esc(p.radicado)}</span>${p.alias?` · <span style="font-weight:500">${esc(p.alias)}</span>`:''}${p.nuevas?` <span class="badge-pill" style="background:rgba(46,204,113,.14);color:#2f7d5b">${p.nuevas} nueva${p.nuevas>1?'s':''}</span>`:''}</p>
+       <p style="font-size:11.5px;color:var(--muted)">${p.encontrado===false?'Sin proceso público para este radicado':esc(c.juzgado||'')}${p.ultima_actuacion?' · última actuación '+esc(fechaCorta(p.ultima_actuacion)):''} · revisado ${p.consultado_at?hace(p.consultado_at):'—'}</p>
+      </div>
+      <button class="glass-pill" onclick="toggleProceso('${p.id}')">${ab?'Ocultar':'Actuaciones'}</button>
+      <button class="glass-pill" onclick="accionProceso('${p.id}','desactivar')">Dejar de monitorear</button>
+     </div>
+     ${ab?`<div style="margin-top:8px;max-height:260px;overflow:auto">${(p.acciones||[]).length?(p.acciones||[]).slice(0,15).map(a=>`<div style="display:flex;gap:10px;padding:6px 0;font-size:12.5px;border-bottom:1px solid rgba(37,75,89,.05)"><span style="white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums">${esc(fechaCorta(a.fecha))}</span><span><strong>${esc(a.tipo||'Actuación')}</strong>${a.nota?' · '+esc(a.nota):''}</span></div>`).join(''):'<p style="font-size:12.5px;color:var(--muted)">Sin actuaciones públicas.</p>'}</div>`:''}
+    </div>`;}).join(''):'<p style="font-size:12.5px;color:var(--muted);margin-top:6px">No hay procesos en seguimiento.</p>'}
+  </div>
+  <div class="glass-security" style="padding:14px;margin-top:20px;font-size:12px;color:var(--muted);text-align:center">Fuentes oficiales consultadas en vivo vía Croma. Solo se consulta por NIT, placa o radicado; no se consultan datos de personas naturales.</div>`;
+}
+
 /* ===== Chat ===== */
 function mdToHtml(md){
- md=esc(md).replace(/&quot;/g,'"');
+ md=esc(md).replace(/&quot;/g,'"').replace(/^\s*⟦consulta⟧\s*(.+)$/gm,'⟦c⟧$1');
  const lines=md.split('\n');let html='',inUl=false,inOl=false,tbl=[];
  const flush=()=>{if(inUl){html+='</ul>';inUl=false}if(inOl){html+='</ol>';inOl=false}
   if(tbl.length){const rows=tbl.filter(r=>!/^\s*\|[-\s|]+\|\s*$/.test(r));
@@ -1122,7 +1290,8 @@ function mdToHtml(md){
  const inl=t=>t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,a,u)=>`<a href="${u.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="color:#1f4e8c;text-decoration:underline;text-underline-offset:2px">${a}</a>`).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*\s][^*]*?)\*/g,'$1<em>$2</em>');
  lines.forEach(l=>{
   if(/^\s*\|.*\|\s*$/.test(l)){if(inUl||inOl)flush();tbl.push(l);return}else if(tbl.length)flush();
-  if(/^&gt;\s|^>\s/.test(l)){flush();html+=`<p style="border-left:3px solid #EABC1F;padding-left:10px;color:#254B59">${inl(l.replace(/^(&gt;|>)\s/,''))}</p>`}
+  if(l.startsWith('⟦c⟧')){flush();html+=`<p style="font-size:12px;color:#7a8a94;font-style:italic;display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;display:inline-flex;color:#EABC1F">${I.shield}</span>${l.slice(3)}</p>`}
+  else if(/^&gt;\s|^>\s/.test(l)){flush();html+=`<p style="border-left:3px solid #EABC1F;padding-left:10px;color:#254B59">${inl(l.replace(/^(&gt;|>)\s/,''))}</p>`}
   else if(/^#{1,3}\s/.test(l)){flush();html+=`<h3>${inl(l.replace(/^#+\s/,''))}</h3>`}
   else if(/^\s*-\s/.test(l)){if(!inUl){flush();html+='<ul>';inUl=true}html+=`<li>${inl(l.replace(/^\s*-\s/,''))}</li>`}
   else if(/^\s*\d+\.\s/.test(l)){if(!inOl){flush();html+='<ol>';inOl=true}html+=`<li>${inl(l.replace(/^\s*\d+\.\s/,''))}</li>`}
@@ -1208,9 +1377,9 @@ const st=document.createElement('style');st.textContent='@keyframes bounce{0%,10
 
 /* init */
 initStatic();
-renderDashboard();renderNormativa();renderContratos();renderManifiesto();renderChat();updateSideScore();
+renderDashboard();renderNormativa();renderContratos();renderManifiesto();renderContrapartes();renderChat();updateSideScore();
 go('dashboard');
-cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();cargarChat();cargarBoletin();
+cargarPanel();cargarNormas();cargarManifiestos();cargarContratos();cargarChat();cargarBoletin();cargarContrapartes();cargarProcesos();
 
 /* logout real: borra la cookie de sesión en el servidor */
 function logout(){if(!PANEL&&!normasDesdeBD){aviso('Modo demostración: no hay una sesión de servidor que cerrar.');return;}fetch('/api/acceso',{method:'DELETE'}).catch(function(){}).finally(function(){location.href='/';});}

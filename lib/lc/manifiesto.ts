@@ -253,9 +253,14 @@ export function verificarManifiesto(d: ManifiestoDatos) {
     })
   }
 
-  const peso = { alto: 0.7, medio: 0.4, bajo: 0.1 }
-  const score = Math.max(1, Math.round((5 - hallazgos.reduce((a, h) => a + peso[h.risk], 0)) * 10) / 10)
+  const score = scoreDe(hallazgos)
   const order = { alto: 0, medio: 1, bajo: 2 }
   hallazgos.sort((a, b) => order[a.risk] - order[b.risk])
   return { campos, hallazgos, score, regimen: regimen1017 ? 'Decreto 1017 de 2025' : 'anterior al Decreto 1017 de 2025' }
+}
+
+// Score del manifiesto: 5 menos el peso de cada hallazgo (documento + verificación del vehículo).
+export function scoreDe(hallazgos: { risk: 'alto' | 'medio' | 'bajo' }[]) {
+  const peso = { alto: 0.7, medio: 0.4, bajo: 0.1 }
+  return Math.max(1, Math.round((5 - hallazgos.reduce((a, h) => a + peso[h.risk], 0)) * 10) / 10)
 }

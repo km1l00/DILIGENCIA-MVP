@@ -17,6 +17,8 @@ export function proxy(request: NextRequest) {
   // Rutas públicas: el login del camión ("/") y la API de acceso
   const isLogin = pathname === '/'
   const isAcceso = pathname.startsWith('/api/acceso')
+  // El cron de Vercel no tiene cookie: la ruta valida su propio CRON_SECRET
+  const isCron = pathname.startsWith('/api/cron/')
 
   if (!GATE) return NextResponse.next()
 
@@ -25,7 +27,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/inicio', request.url))
   }
 
-  if (!authed && !isLogin && !isAcceso) {
+  if (!authed && !isLogin && !isAcceso && !isCron) {
     // APIs: 401 en JSON (el front muestra el respaldo o vuelve al login)
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })

@@ -100,6 +100,12 @@ export async function analizarContrato(nombreArchivo: string, texto: string, arc
   return row.id as string
 }
 
+// NIT de la parte que el contrato identifica como empresa de transporte ("... NIT 901.780.925 (en adelante, la EMPRESA DE TRANSPORTE)").
+export function nitEmpresaTransporte(texto: string): string | null {
+  const m = texto.slice(0, 4000).match(/NIT\.?\s*(?:No\.?\s*|n[úu]mero\s*)?([\d][\d.\s]{5,14}\d(?:\s*-\s*\d)?)[^.;]{0,120}?EMPRESA DE TRANSPORTE/i)
+  return m ? m[1].replace(/\s/g, '') : null
+}
+
 export async function detalleContrato(id: string) {
   const d = db()
   const c = must(await d.from('lc_contratos').select('*').eq('id', id).single()) as any
@@ -112,6 +118,7 @@ export async function detalleContrato(id: string) {
       id: c.id, nombre: c.nombre, partes: c.partes, fecha: c.fecha, archivo_nombre: c.archivo_nombre, tiene_original: !!c.archivo_path,
       texto_original: c.texto_original, encabezado: c.encabezado, num_clausulas: c.num_clausulas, score_base: Number(c.score_base),
       score, add, resumen: c.resumen, modelo: c.modelo, activo: c.activo, created_at: c.created_at, updated_at: c.updated_at,
+      nit_empresa: nitEmpresaTransporte(c.texto_original || ''),
     },
     hallazgos: hs.map((h) => ({ ...h, new_text: limpiarCuerpo(h.new_text, h.clausula_titulo), impacto: Number(h.impacto) })),
     vigente: aplicarHallazgos(originales, hs, true),

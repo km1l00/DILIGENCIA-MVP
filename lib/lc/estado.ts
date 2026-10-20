@@ -7,7 +7,7 @@ export async function contratoActivo() {
   return c[0] || null
 }
 export async function manifiestoActivo() {
-  const m = must(await db().from('lc_manifiestos').select('id,numero,score,hallazgos,datos').eq('activo', true).order('created_at', { ascending: false }).limit(1)) as any[]
+  const m = must(await db().from('lc_manifiestos').select('id,numero,score,hallazgos,datos,verificacion').eq('activo', true).order('created_at', { ascending: false }).limit(1)) as any[]
   return m[0] || null
 }
 
@@ -28,7 +28,7 @@ export async function panel() {
     hallContrato = hs.filter((h) => !h.implementado).length
     contratoScore = scoreContrato(Number(c.score_base), hs).score
   }
-  const hallManif = m ? (m.hallazgos as unknown[]).length : 0
+  const hallManif = m ? (m.hallazgos as unknown[]).length + ((m.verificacion?.hallazgos as unknown[]) || []).length : 0
   const manifScore = m ? Number(m.score) : null
   const scores = [contratoScore, manifScore].filter((x): x is number => x !== null)
   return {
