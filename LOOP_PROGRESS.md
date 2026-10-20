@@ -55,3 +55,15 @@ Estados: `pendiente` · `hecho` (build local OK) · `verificado-prod` (probado e
 | 3 (asistente + normativa + boletín) | chat 2× Opus · normativa 2× Opus + 2× Haiku (web_search 20 búsquedas) · boletín 1× Opus | Opus 316k in / 15k out · Haiku ~100k in / 4k out | ~$1,85 (normativa con Opus ≈ $1,40) |
 | 4 (regresión) | 1× Haiku manifiesto · 4× Opus chat (pruebas de streaming) · 1× Haiku normativa | ~70k in / 4k out | ~$0,20 |
 | **Total acumulado (medido en lc_ia_uso)** | 19 llamadas + 20 búsquedas web | | **≈ $2,40** ($2,22 tokens + ~$0,20 búsquedas; normativa con Opus fue $1,53) |
+
+## Integración Croma (19-20/10/2026) — verificado en https://diligencia-mvp-sand.vercel.app
+
+| # | Ítem | Estado | Evidencia |
+|---|------|--------|-----------|
+| K1 | Ficha de empresa de transporte por NIT | verificado-prod | Botón en Contratos → GRUPO NF S.A.S (NIT 901780925-1): RUES activa, CIIU 4923, renovó 2026 el 04/05/2026 → hallazgo bajo "renovada fuera de término" (C. Co. art. 33), sin sanciones SECOP, sin antecedentes Procuraduría, 0 procesos activos; score 4.8. T.D.M. TRANSPORTES (890904488-1) desde Manifiesto: score 5.0. Se corrigieron 2 errores propios: CIIU tomado de `ciiu_4` en vez de la actividad principal (falso positivo) y búsqueda judicial con nombre normalizado que daba `too_many_results` (ahora razón social exacta primero) |
+| K2 | Manifiesto vs. RUNT y SIMIT | verificado-prod | Manifiesto 01278713, placa JCR435: el RUNT la registra como AUTOMÓVIL particular (KIA 2017) → hallazgo medio "configuración 3S2 no corresponde a la clase" (Res. 4100/2004); SOAT y RTM vigentes al 13/05/2025; SIMIT sin saldo; score 2.9 → 2.5. Caché sin propietarios ni infractores (fila existente depurada) |
+| K3 | Herramientas de Croma en el asistente | verificado-prod | "¿la empresa de transporte del manifiesto tiene problemas…?" → ⟦consulta⟧ RUES/Rama/SECOP/Procuraduría NIT 890904488-1 y respuesta con fuentes; "verifica el vehículo… ¿quién es el propietario?" → consulta RUNT/SIMIT y se niega a dar el propietario. Se añadió al contexto el NIT de la empresa, la placa y la verificación del vehículo (antes faltaban) |
+| K4 | Monitoreo judicial diario | verificado-prod | Radicado de ejemplo de la documentación de Croma (05001310300120190012300): agregado (Juzgado 001 Civil del Circuito de Medellín, 9 actuaciones); revisión con actuación simulada como no vista → "1 actuaciones nuevas" y evento en la actividad; `/api/cron/procesos` 401 sin secreto, 200 con secreto; cron registrado en Vercel (0 11 * * *). Radicado de ejemplo desactivado al final |
+| K5 | Regresión y consola | verificado-prod | Pestaña limpia: 10 llamadas /api/lc/* en 200, 0 mensajes de consola. Se movieron las funciones a gru1 y las lecturas tienen 25 s + 1 reintento (antes un arranque en frío cortaba /panel a los 12 s) |
+
+Créditos Croma usados: ~103 de 1.500 (saldo informado por Croma: 1.397). Claude: 4 preguntas de chat con Opus 5.5 (< $0,20).

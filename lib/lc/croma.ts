@@ -77,6 +77,14 @@ async function llamar(endpoint: string, body: unknown, items: number, deadlineMs
 }
 
 // Consulta con caché. ttlHoras=0 fuerza consulta nueva.
+// Quita datos de personas naturales que algunas fuentes devuelven y que no usamos (propietarios, infractores).
+export function sinDatosPersonales(endpoint: string, data: any): any {
+  if (!data || typeof data !== 'object') return data
+  if (endpoint.startsWith('/co/runt/')) { const { owners, accident, guarantee, ...resto } = data; return { ...resto, owners_count: Array.isArray(owners) ? owners.length : undefined } }
+  if (endpoint.startsWith('/co/simit/')) return { ...data, fines: (data.fines || []).map(({ offender, ...f }: any) => f) }
+  return data
+}
+
 export async function croma<T = any>(endpoint: string, body: Record<string, unknown>, opts: { ttlHoras: number; items?: number; timeoutMs?: number }): Promise<{ data: T; cache: boolean; consultado: string }> {
   const clave = claveDe(endpoint, body)
   if (opts.ttlHoras > 0) {
@@ -88,7 +96,7 @@ export async function croma<T = any>(endpoint: string, body: Record<string, unkn
   if ((await creditosHoy()) + costo(endpoint, items) > CROMA_TOPE_DIARIO) {
     throw new CromaError(`Se alcanzó el tope diario de ${CROMA_TOPE_DIARIO} créditos de Croma`, 429, 'tope_diario')
   }
-  const data = await llamar(endpoint, body, items, Date.now() + (opts.timeoutMs ?? 110_000))
+  const data = sinDatosPersonales(endpoint, await llamar(endpoint, body, items, Date.now() + (opts.timeoutMs ?? 110_000)))
   const ahora = new Date().toISOString()
   await db().from('lc_croma_cache').upsert({ clave, endpoint, respuesta: data, created_at: ahora })
   return { data: data as T, cache: false, consultado: ahora }

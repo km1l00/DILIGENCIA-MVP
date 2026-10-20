@@ -229,8 +229,17 @@ const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 
 /* ===== API (servidor) con respaldo ===== */
 // Si el servidor no responde a tiempo o falla, la vista conserva los datos de respaldo y se muestra un aviso discreto.
-const API_TIMEOUT=12000;
+const API_TIMEOUT=25000;
+// Las lecturas (GET) se reintentan una vez si se cortan: el primer acceso tras un despliegue arranca las funciones en frío.
 async function api(path,opts){
+ opts=opts||{};
+ if((opts.method||'GET')==='GET'&&!opts._reintento){
+  try{return await apiUnaVez(path,opts);}
+  catch(e){if(e&&(e.name==='AbortError'||/aborted|network|Failed to fetch/i.test(e.message||''))){return apiUnaVez(path,{...opts,_reintento:true});}throw e;}
+ }
+ return apiUnaVez(path,opts);
+}
+async function apiUnaVez(path,opts){
  opts=opts||{};const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),opts.timeout||API_TIMEOUT);
  try{
   const r=await fetch(path,{method:opts.method||'GET',headers:opts.body&&!(opts.body instanceof FormData)?{'content-type':'application/json'}:undefined,
@@ -1118,7 +1127,7 @@ function renderManifiesto(){
    ${ru?`<div style="display:grid;gap:14px;grid-template-columns:repeat(4,1fr)" class="grid-kpi">
     ${kv('Clase',esc(ru.clase||'—'))}${kv('Servicio',esc(ru.servicio||'—'))}${kv('Estado RUNT',esc(ru.estado||'—'))}${kv('Marca y modelo',esc([ru.marca,ru.modelo].filter(Boolean).join(' ')||'—'))}
     ${kv('SOAT en la fecha',ru.soat_en_fecha?'<span style="color:#2f7d5b">Vigente</span>':'<span style="color:#e05252">No vigente</span>')}${kv('Revisión técnico-mecánica',ru.rtm_exento?'Exento (vehículo nuevo)':ru.rtm_en_fecha?'<span style="color:#2f7d5b">Vigente</span>':'<span style="color:#e05252">No vigente</span>')}
-    ${kv('SIMIT',si?(si.al_dia?'<span style="color:#2f7d5b">Al día</span>':`${si.comparendos} pendientes · ${COP(si.valor_pendiente||0)}`):'—')}${kv('Matrícula',esc(fechaCorta(ru.matricula)))}
+    ${kv('SIMIT',si?((si.al_dia||!Number(si.valor_pendiente))?'<span style="color:#2f7d5b">Sin comparendos pendientes</span>':`${si.comparendos} pendientes · ${COP(si.valor_pendiente||0)}`):'—')}${kv('Matrícula',esc(fechaCorta(ru.matricula)))}
    </div>`:'<p style="font-size:13px;color:var(--muted)">RUNT no disponible.</p>'}
    ${(v.errores||[]).length?`<p style="font-size:12px;color:#b5652a;margin-top:10px">${esc(v.errores.join(' · '))}</p>`:''}
   </div>

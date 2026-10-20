@@ -71,7 +71,8 @@ export async function verificarVehiculo(datos: any) {
   let resumenSimit: any = null
   if (simit) {
     const s = simit.summary || {}
-    resumenSimit = { encontrado: !!simit.found, al_dia: !!simit.clear, total: s.total ?? 0, comparendos: s.payable_fines_count ?? (simit.fines || []).length, valor_pendiente: s.payable_total ?? 0,
+    // "clear" puede venir en false sin saldo pendiente: se considera al día si no hay valor por pagar
+    resumenSimit = { encontrado: !!simit.found, al_dia: !!simit.clear || !(Number(s.payable_total) > 0), total: s.total ?? 0, comparendos: s.payable_fines_count ?? (simit.fines || []).length, valor_pendiente: s.payable_total ?? 0,
       detalle: (simit.fines || []).slice(0, 5).map((f: any) => ({ fecha: f.infraction_date, estado: f.status, autoridad: f.traffic_authority, valor: f.amount_payable ?? f.amount, infraccion: f.infractions?.[0]?.description })) }
     if (simit.found && !simit.clear && (s.payable_total || 0) > 0) {
       h.push({ risk: 'bajo', codigo: 'V-SIMIT', t: `El vehículo tiene ${resumenSimit.comparendos} comparendo(s) pendiente(s) en el SIMIT`, detalle: `Saldo pendiente: $${Number(s.payable_total).toLocaleString('es-CO')}. Es una obligación del propietario del vehículo, no del generador, pero es una señal de riesgo operativo (inmovilizaciones) en la empresa de transporte.`, base: 'Ley 769 de 2002, art. 10 (SIMIT)', url: URL_L769, actual: `$${Number(s.payable_total).toLocaleString('es-CO')} pendientes`, sugerido: 'Solicitar a la empresa de transporte el paz y salvo del vehículo.' })

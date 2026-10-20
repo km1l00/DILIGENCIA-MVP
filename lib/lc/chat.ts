@@ -36,6 +36,7 @@ export async function contextoChat(normaCodigo?: string | null): Promise<{ norma
     const det = await detalleContrato(c.id)
     contratoTxt = [
       `${det.contrato.nombre} · ${det.contrato.partes} · riesgo ${det.contrato.score.toFixed(1)}/5 (base ${det.contrato.score_base.toFixed(1)})`,
+      det.contrato.nit_empresa ? `NIT de la empresa de transporte según el contrato: ${det.contrato.nit_empresa}` : '',
       det.contrato.resumen ? `Resumen: ${det.contrato.resumen}` : '',
       'Hallazgos:',
       ...det.hallazgos.map((h) => `- ${h.codigo} [${h.risk}${h.implementado ? ', implementado' : ''}] ${h.titulo}`),
@@ -49,7 +50,9 @@ export async function contextoChat(normaCodigo?: string | null): Promise<{ norma
   if (m) {
     const dt = m.datos as any
     manifTxt = [
-      `Manifiesto N.º ${m.numero} · cumplimiento ${Number(m.score).toFixed(1)}/5 · expedición ${dt.expedicion ?? 's. d.'} · empresa de transporte ${dt.empresa?.nombre ?? 's. d.'}`,
+      `Manifiesto N.º ${m.numero} · cumplimiento ${Number(m.score).toFixed(1)}/5 · expedición ${dt.expedicion ?? 's. d.'} · empresa de transporte ${dt.empresa?.nombre ?? 's. d.'} (NIT ${dt.empresa?.nit ?? 's. d.'})`,
+      `Vehículo: placa ${dt.vehiculo?.placa ?? 's. d.'} · configuración ${dt.vehiculo?.configuracion ?? 's. d.'}${m.verificacion ? ` · verificado en RUNT/SIMIT: clase ${m.verificacion.runt?.clase ?? 's. d.'}, SOAT en la fecha ${m.verificacion.runt?.soat_en_fecha ? 'vigente' : 'no vigente'}, revisión técnico-mecánica ${m.verificacion.runt?.rtm_en_fecha ? 'vigente' : 'no vigente'}` : ''}`,
+      ...(((m.verificacion?.hallazgos as any[]) || []).map((h) => `- [${h.risk}] ${h.t} (${h.base})`)),
       `Valor a pagar ${dt.valor_total ?? 's. d.'} · ICA ${dt.retencion_ica ?? 's. d.'} · fecha de pago ${dt.fecha_pago ?? 's. d.'} · cargue pagado por ${dt.cargue_pagado_por ?? 'sin diligenciar'} · descargue pagado por ${dt.descargue_pagado_por ?? 'sin diligenciar'}`,
       'Hallazgos:',
       ...(m.hallazgos as any[]).map((h) => `- [${h.risk}] ${h.t} (${h.base})`),

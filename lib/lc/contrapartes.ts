@@ -31,8 +31,14 @@ export function evaluarContraparte(nit: string, rues: any, procesos: any, sancio
     const debe = hoyBogota() > limite ? anio : anio - 1
     if (renovado && renovado < debe) {
       h.push({ risk: 'medio', codigo: 'RUES-RENOV', t: `Matrícula sin renovar desde ${renovado}`, detalle: `El último año renovado es ${renovado}. La matrícula mercantil se renueva cada año dentro de los tres primeros meses; a la fecha debería estar renovada para ${debe}.`, base: 'Código de Comercio, art. 33', url: URL_CCO })
+    } else if (renovado && e.last_renewal_date) {
+      // Renovación del año hecha después del 31 de marzo de ese año: extemporánea
+      const fr = new Date(String(e.last_renewal_date).slice(0, 10) + 'T00:00:00Z')
+      if (!isNaN(fr.getTime()) && fr.getUTCFullYear() === renovado && fr > new Date(Date.UTC(renovado, 2, 31, 23, 59))) {
+        h.push({ risk: 'bajo', codigo: 'RUES-EXTEMP', t: `Matrícula de ${renovado} renovada fuera de término (${String(e.last_renewal_date).slice(0, 10)})`, detalle: `La renovación del año ${renovado} se registró después del 31 de marzo. La matrícula debe renovarse dentro de los tres primeros meses de cada año; la renovación tardía es una señal de debilidad en el cumplimiento corporativo de la empresa de transporte.`, base: 'Código de Comercio, art. 33', url: URL_CCO })
+      }
     }
-    const ciiu = String(e.ciiu_4?.code || e.primary_activity?.code || '')
+    const ciiu = String(e.primary_activity?.code || '')
     if (!e.is_transport && !/^49/.test(ciiu)) {
       h.push({ risk: 'medio', codigo: 'RUES-ACT', t: 'La actividad registrada no corresponde a transporte de carga', detalle: `Actividad principal: ${e.primary_activity?.description || e.ciiu_4?.description || 'sin dato'} (CIIU ${ciiu || 's. d.'}). El servicio público de transporte de carga solo lo puede prestar una empresa de transporte habilitada; pida la resolución de habilitación del Ministerio de Transporte, que no consta en el RUES.`, base: 'Decreto 1079 de 2015 (habilitación de empresas de transporte de carga)', url: URL_D1079 })
     }
@@ -55,6 +61,23 @@ export function evaluarContraparte(nit: string, rues: any, procesos: any, sancio
   return { hallazgos: h, score }
 }
 
+// La Rama Judicial solo busca por nombre: primero la razón social exacta del RUES, luego sin puntos y por último el núcleo
+// del nombre. Si una variante arroja "demasiadas coincidencias" (no cuesta créditos) se prueba la siguiente.
+async function buscarProcesos(nombre: string, ttlHoras: number): Promise<{ data: any; consulta: string }> {
+  const variantes = [...new Set([nombre.trim(), nombre.replace(/\./g, '').replace(/\s+/g, ' ').trim(), norm(nombre)])].filter((v) => v.length >= 3)
+  let ultimo: unknown = null
+  for (const v of variantes) {
+    try {
+      const r = await croma('/co/rama-judicial/cases-by-entity/v1', { name: v, entity_type: 'juridical', active_only: true }, { ttlHoras })
+      return { data: r.data, consulta: v }
+    } catch (e) {
+      ultimo = e
+      if (!(e instanceof CromaError && e.code === 'too_many_results')) throw e
+    }
+  }
+  throw new CromaError('La búsqueda por razón social arroja demasiadas coincidencias en la Rama Judicial; consulte por radicado', 400, 'too_many_results')
+}
+
 async function seguro<T>(f: () => Promise<T>): Promise<{ ok: true; v: T } | { ok: false; error: string }> {
   try { return { ok: true, v: await f() } } catch (e) {
     if (e instanceof CromaError && (e.status === 402 || e.code === 'tope_diario' || e.status === 503)) throw e
@@ -73,15 +96,16 @@ export async function fichaContraparte(nitIn: string, refrescar = false) {
     seguro(() => croma('/co/secop/sanctions-search/v1', { provider_document: nit, per_page: 20 }, { ttlHoras: ttl(TTL.secop) })),
     seguro(() => croma('/co/procuraduria/disciplinary-records/v1', { document_type: 'NIT', document_number: nit }, { ttlHoras: ttl(TTL.procuraduria) })),
     nombre
-      ? seguro(() => croma('/co/rama-judicial/cases-by-entity/v1', { name: norm(nombre), entity_type: 'juridical', active_only: true }, { ttlHoras: ttl(TTL.procesos) }))
+      ? seguro(() => buscarProcesos(nombre, ttl(TTL.procesos)))
       : Promise.resolve({ ok: false as const, error: 'Sin razón social del RUES para buscar procesos' }),
   ])
   // La Rama Judicial busca por nombre: solo se cuentan los casos cuyo texto de partes contiene la razón social.
   let procesos: any = null
   if (rama.ok) {
-    const core = norm(nombre || '')
+    const compacto = (s: string) => norm(s).replace(/ /g, '')
+    const core = compacto(nombre || '')
     const casos = (rama.v.data?.cases || []) as any[]
-    procesos = { total_busqueda: rama.v.data?.pagination?.total ?? casos.length, coincidencias: casos.filter((c) => core && norm(c.parties_text || '').includes(core)).slice(0, 25) }
+    procesos = { busqueda: rama.v.consulta, total_busqueda: rama.v.data?.pagination?.total ?? casos.length, coincidencias: casos.filter((c) => core && compacto(c.parties_text || '').includes(core)).slice(0, 25) }
   }
   const ruesData = rues.ok ? rues.v.data : null
   const ev = evaluarContraparte(nit, ruesData, procesos, sanc.ok ? sanc.v.data : null, procu.ok ? procu.v.data : null)
@@ -92,7 +116,7 @@ export async function fichaContraparte(nitIn: string, refrescar = false) {
     rues: ruesData ? {
       found: ruesData.found, nombre: e?.name, nit: e?.nit, dv: e?.verification_digit, estado: e?.registration_status, camara: e?.chamber_name,
       matricula: e?.registration_number, organizacion: e?.legal_organization, fecha_matricula: e?.registration_date, ultima_renovacion: e?.last_renewal_date,
-      anio_renovado: e?.last_renewed_year, actividad: e?.primary_activity?.description, ciiu: e?.ciiu_4?.code || e?.primary_activity?.code,
+      anio_renovado: e?.last_renewed_year, actividad: e?.primary_activity?.description, ciiu: e?.primary_activity?.code,
       es_transporte: e?.is_transport, municipio: e?.commercial_municipality,
       representantes: (ruesData.related_parties || []).filter((p: any) => /REPRESENTANTE|GERENTE/i.test(p.role || '')).slice(0, 4).map((p: any) => ({ nombre: p.name, rol: p.role })),
       certificado_url: e?.certificates_sale_url || null,
